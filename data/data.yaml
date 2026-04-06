@@ -1,7 +1,7 @@
-path: ./data
+path: /home/corneille/Github/delphin-eye/data
 
-train: images/train
-val: images/val
+train: processed/train
+val: processed/val
 
 names:
-  0: fin
+  0: dorsal_fin
