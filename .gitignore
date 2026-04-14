@@ -208,7 +208,11 @@ __marimo__/
 
 data/labels/
 data/processed/
-output/models/saved/
-output/runs/
+data/predict/
+output/models/
+output/predictions/
 
 .idea/
+
+yolo26n.pt
+yolo26n/

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#082f49"/>
+      <stop offset="100%" stop-color="#0c4a6e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#ocean)"/>
+  <path d="M0,500 C230,430 420,560 620,500 C830,440 980,530 1280,470 L1280,720 L0,720 Z" fill="#0e7490" opacity="0.6"/>
+  <path d="M560,410 C590,360 650,340 710,360 C760,375 780,405 790,430 C730,440 660,450 600,445 Z" fill="#22d3ee" opacity="0.55"/>
+  <text x="640" y="350" text-anchor="middle" fill="#bae6fd" font-family="Arial, sans-serif" font-size="34">Mock Dolphin Frame</text>
+  <text x="640" y="385" text-anchor="middle" fill="#7dd3fc" font-family="Arial, sans-serif" font-size="18">Replace with local image paths once backend integration is ready</text>
+</svg>
+
