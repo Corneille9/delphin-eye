@@ -90,6 +90,19 @@ class AppState:
         self.notify()
         return True
 
+    def reset_folder(self) -> None:
+        self.prediction.cancel()
+        folder = self.queue.folder
+        if folder is not None:
+            self.persistence.clear_folder(folder)
+        self.queue.clear()
+        self.current_index = 0
+        self.selected_detection_index = None
+        self.detection_progress = (0, 0)
+        self.persistence.set_state(self.LAST_FOLDER_KEY, '')
+        self.persistence.set_state(self.LAST_INDEX_KEY, '0')
+        self.notify()
+
     def load_folder(self, folder: Path) -> None:
         self.queue.load_folder(folder)
         self.current_index = 0
@@ -153,7 +166,7 @@ class AppState:
     def add_manual_detection(self, x1: float, y1: float, x2: float, y2: float) -> Detection:
         image = self.current_image
         if image is None:
-            raise RuntimeError('Aucune image selectionnee.')
+            raise RuntimeError('Aucune image sélectionnée.')
         next_id = max((d.local_id for d in image.detections), default=0) + 1
         det = Detection(
             local_id=next_id,

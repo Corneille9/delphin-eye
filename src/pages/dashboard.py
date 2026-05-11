@@ -30,7 +30,7 @@ def _pick_folder_native() -> str | None:
     root.withdraw()
     root.attributes('-topmost', True)
     try:
-        folder = filedialog.askdirectory(title='Choisir un dossier d\'images')
+        folder = filedialog.askdirectory(title="Choisir un dossier d'images")
     finally:
         root.destroy()
     return folder or None
@@ -54,17 +54,23 @@ def register_dashboard_page(image_url_builder) -> None:
 
         settings_dialog = SettingsDialog()
 
+        # ── Folder dialog (fallback when no native picker) ────────────
         def manual_folder_dialog() -> None:
-            with ui.dialog() as dialog, ui.card():
-                ui.label('Entrer le chemin du dossier').classes('app-title')
-                inp = ui.input('Chemin', value=str(state.queue.folder or '')) \
-                    .props('outlined dense').classes('w-full').style('min-width: 420px;')
-                with ui.row().classes('w-full justify-end'):
-                    ui.button('Annuler', on_click=dialog.close).props('flat no-caps')
-                    def confirm():
+            with ui.dialog() as dialog, ui.card().style('min-width: 460px;'):
+                ui.label('Chemin du dossier').classes('app-title').style('margin-bottom: 8px;')
+                inp = (
+                    ui.input('Chemin', value=str(state.queue.folder or ''))
+                    .props('outlined dense')
+                    .classes('w-full')
+                )
+                with ui.row().classes('w-full justify-end gap-2').style('margin-top: 12px;'):
+                    ui.button('Annuler', on_click=dialog.close).props('flat no-caps').classes('app-ghost')
+
+                    def confirm() -> None:
                         path = Path(str(inp.value or '')).expanduser()
                         dialog.close()
                         _load_folder(path)
+
                     ui.button('Ouvrir', on_click=confirm).props('no-caps').classes('app-primary')
             dialog.open()
 
@@ -74,7 +80,7 @@ def register_dashboard_page(image_url_builder) -> None:
                 return
             try:
                 state.load_folder(path)
-                ui.notify(f'{state.total} images chargees.', type='positive')
+                ui.notify(f'{state.total} images chargées.', type='positive')
             except Exception as exc:
                 ui.notify(f'Erreur : {exc}', type='negative')
 
@@ -85,18 +91,19 @@ def register_dashboard_page(image_url_builder) -> None:
             else:
                 manual_folder_dialog()
 
+        def on_reset_folder() -> None:
+            state.reset_folder()
+            ui.notify('Dossier réinitialisé.', type='info')
+
         def on_run_detection() -> None:
             if state.total == 0:
                 ui.notify('Chargez d\'abord un dossier.', type='warning')
                 return
             if not state.prediction.model_available():
-                ui.notify(
-                    f'Modele YOLO introuvable : {settings.model_path}',
-                    type='negative',
-                )
+                ui.notify(f'Modèle YOLO introuvable : {settings.model_path}', type='negative')
                 return
             if state.prediction.running:
-                ui.notify('Detection deja en cours.', type='info')
+                ui.notify('Détection déjà en cours.', type='info')
                 return
 
             def on_update() -> None:
@@ -105,42 +112,50 @@ def register_dashboard_page(image_url_builder) -> None:
             def on_finished(processed: int) -> None:
                 state.queue.refresh()
                 state.notify()
-                ui.notify(f'Detection terminee : {processed} images traitees.', type='positive')
+                ui.notify(f'Détection terminée : {processed} images traitées.', type='positive')
 
-            ui.notify('Detection demarree en arriere-plan...', type='info')
+            ui.notify('Détection démarrée en arrière-plan…', type='info')
             state.run_detection(on_update, on_finished)
 
         def on_export() -> None:
             if state.total == 0:
-                ui.notify('Rien a exporter.', type='warning')
+                ui.notify('Rien à exporter.', type='warning')
                 return
             try:
                 summary = state.export.export_all(state.images)
                 ui.notify(
-                    f"Export OK : {summary['validated']} validees, "
-                    f"{summary['rejected']} rejetees - {summary['output_dir']}",
+                    f"Export OK : {summary['validated']} validées, "
+                    f"{summary['rejected']} rejetées - {summary['output_dir']}",
                     type='positive',
                 )
             except Exception as exc:
                 ui.notify(f'Erreur export : {exc}', type='negative')
 
+        # ── Layout ────────────────────────────────────────────────────
         with ui.element('div').style(
-            'width: 100%; height: 100vh; display: flex; flex-direction: column; gap: 10px; padding: 10px;'
+            'width: 100%; height: 100vh; overflow: hidden; '
+            'display: flex; flex-direction: column; gap: 8px; padding: 8px;'
         ):
             TopBar(
                 state,
                 on_select_folder=on_select_folder,
+                on_reset_folder=on_reset_folder,
                 on_run_detection=on_run_detection,
                 on_export=on_export,
                 on_open_settings=settings_dialog.open,
             )
 
-            with ui.row().classes('no-wrap').style(
-                'flex: 1; min-height: 0; gap: 10px; width: 100%;'
+            # Plain div (not ui.row) to avoid Quasar q-gutter negative margins
+            with ui.element('div').style(
+                'flex: 1; min-height: 0; '
+                'display: flex; flex-direction: row; gap: 8px;'
             ):
                 Sidebar(state)
-                with ui.element('div').style(
-                    'flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0;'
+
+                # Center: canvas + toolbar as one unified card
+                with ui.element('div').classes('app-surface').style(
+                    'flex: 1; min-width: 0; min-height: 0; overflow: hidden; '
+                    'display: flex; flex-direction: column;'
                 ):
                     canvas = CanvasView(state, image_url_builder=image_url_builder)
                     ActionToolbar(
@@ -148,8 +163,10 @@ def register_dashboard_page(image_url_builder) -> None:
                         on_add_box=canvas.start_add_mode,
                         on_delete_box=canvas.delete_selected,
                     )
+
                 StatusPanel(state)
 
+        # ── Keyboard shortcuts ────────────────────────────────────────
         def on_key(event: events.KeyEventArguments) -> None:
             if not event.action.keydown:
                 return

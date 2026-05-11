@@ -3,7 +3,16 @@ from __future__ import annotations
 from nicegui import ui
 
 from models.app_state import AppState
-from models.entities import ImageStatus, STATUS_ICON, STATUS_LABEL_FR
+from models.entities import ImageStatus, STATUS_LABEL_FR
+
+
+_STATUS_DOT = {
+    ImageStatus.PENDING:     'status-dot status-dot-pending',
+    ImageStatus.VALIDATED:   'status-dot status-dot-validated',
+    ImageStatus.REJECTED:    'status-dot status-dot-rejected',
+    ImageStatus.MANUAL_EDIT: 'status-dot status-dot-manual_edit',
+    ImageStatus.PROCESSED:   'status-dot status-dot-processed',
+}
 
 
 class Sidebar:
@@ -11,25 +20,32 @@ class Sidebar:
         self.state = state
 
         with ui.element('div').classes('app-surface').style(
-            'width: 280px; height: 100%; display: flex; flex-direction: column;'
+            'width: 256px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;'
         ):
-            with ui.element('div').style('padding: 12px 14px; border-bottom: 1px solid var(--color-border);'):
-                ui.label('File d\'attente').classes('app-title')
-                self.counter_label = ui.label('').classes('app-muted')
+            # ── Header ──────────────────────────────────────
+            with ui.element('div').style(
+                'padding: 12px 14px 10px; border-bottom: 1px solid var(--color-border); flex-shrink: 0;'
+            ):
+                with ui.row().classes('items-center justify-between w-full no-wrap').style('margin-bottom: 8px;'):
+                    ui.label("File d'attente").classes('app-title')
+                    self.counter_label = ui.label('0 / 0').classes('app-caption').style(
+                        'background: #F1F5F9; padding: 2px 8px; border-radius: 999px;'
+                    )
 
-            self.filter = ui.select(
-                options={
-                    'all': 'Toutes',
-                    'pending': 'En attente',
-                    'validated': 'Validees',
-                    'rejected': 'Rejetees',
-                    'manual_edit': 'Modifiees',
-                },
-                value='all',
-                on_change=lambda _e: self.refresh(),
-            ).props('dense outlined').style('margin: 8px 14px;')
+                self.filter = ui.select(
+                    options={
+                        'all': 'Toutes les images',
+                        'pending': 'En attente',
+                        'validated': 'Validées',
+                        'rejected': 'Rejetées',
+                        'manual_edit': 'Modifiées',
+                    },
+                    value='all',
+                    on_change=lambda _: self.refresh(),
+                ).props('dense outlined').style('width: 100%;')
 
-            self.list_container = ui.scroll_area().classes('flex-1').style('padding: 0 8px 12px 8px;')
+            # ── List ─────────────────────────────────────────
+            self.list_container = ui.scroll_area().style('flex: 1; min-height: 0;')
 
         state.subscribe(self.refresh)
         self.refresh()
@@ -37,26 +53,40 @@ class Sidebar:
     def refresh(self) -> None:
         total = self.state.total
         idx = self.state.current_index + 1 if total else 0
-        self.counter_label.text = f'Image {idx} / {total}'
+        self.counter_label.text = f'{idx} / {total}'
 
-        self.list_container.clear()
         active_filter = self.filter.value if hasattr(self, 'filter') else 'all'
 
+        self.list_container.clear()
         with self.list_container:
-            for index, image in enumerate(self.state.images):
-                if active_filter != 'all' and image.status.value != active_filter:
-                    continue
-                is_active = index == self.state.current_index
-                classes = 'app-queue-item'
-                if is_active:
-                    classes += ' active'
-                row = ui.element('div').classes(classes)
-                row.on('click', lambda _e, i=index: self.state.select_image(i))
-                with row:
-                    badge = STATUS_ICON.get(image.status, '?')
-                    tooltip = STATUS_LABEL_FR.get(image.status, image.status.value)
-                    ui.label(f'{index + 1:>3}.').style('color: var(--color-muted); min-width: 32px;')
-                    ui.label(image.filename).style('flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;')
-                    ui.label(badge).style(
-                        'font-weight: 600; color: var(--color-primary);'
-                    ).tooltip(tooltip)
+            with ui.element('div').style('padding: 6px 8px; display: flex; flex-direction: column; gap: 2px;'):
+                visible = [
+                    (i, img) for i, img in enumerate(self.state.images)
+                    if active_filter == 'all' or img.status.value == active_filter
+                ]
+
+                if not visible:
+                    ui.label('Aucune image').classes('app-muted').style(
+                        'padding: 16px 8px; text-align: center;'
+                    )
+                    return
+
+                for index, image in visible:
+                    is_active = index == self.state.current_index
+                    dot_cls = _STATUS_DOT.get(image.status, 'status-dot')
+                    tip = STATUS_LABEL_FR.get(image.status, image.status.value)
+
+                    row = ui.element('div').classes(
+                        'app-queue-item' + (' active' if is_active else '')
+                    )
+                    row.on('click', lambda _e, i=index: self.state.select_image(i))
+
+                    with row:
+                        ui.html(f'<span class="{dot_cls}" title="{tip}"></span>')
+                        ui.label(image.filename).style(
+                            'flex: 1; min-width: 0; overflow: hidden; '
+                            'text-overflow: ellipsis; white-space: nowrap;'
+                        )
+                        ui.label(str(index + 1)).classes('app-caption').style(
+                            'flex-shrink: 0; min-width: 18px; text-align: right;'
+                        )

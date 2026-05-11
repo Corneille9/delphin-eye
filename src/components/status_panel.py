@@ -13,71 +13,115 @@ class StatusPanel:
         self.state = state
 
         with ui.element('div').classes('app-surface app-hide-md').style(
-            'width: 320px; height: 100%; display: flex; flex-direction: column; padding: 14px;'
+            'width: 280px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;'
         ):
-            ui.label('Informations image').classes('app-title')
+            # ── Header ───────────────────────────────────────
+            with ui.element('div').style(
+                'padding: 12px 14px 10px; border-bottom: 1px solid var(--color-border); flex-shrink: 0;'
+            ):
+                ui.label('Informations').classes('app-title')
 
-            self.file_label = ui.label('').classes('app-muted').style('margin-top: 8px;')
-            self.path_label = ui.label('').classes('app-muted').style('font-size: 0.75rem; word-break: break-all;')
+            # ── Content (scrollable) ─────────────────────────
+            with ui.scroll_area().style('flex: 1; min-height: 0;'):
+                with ui.element('div').style('padding: 12px 14px; display: flex; flex-direction: column; gap: 12px;'):
 
-            with ui.row().classes('items-center gap-2').style('margin-top: 10px;'):
-                ui.label('Statut :').classes('app-muted')
-                self.status_badge = ui.html('')
+                    # Image info block
+                    with ui.element('div').style('display: flex; flex-direction: column; gap: 4px;'):
+                        self.file_label = ui.label('').style(
+                            'font-size: 0.82rem; font-weight: 600; color: var(--color-text); '
+                            'word-break: break-all;'
+                        )
+                        self.path_label = ui.label('').classes('app-caption').style('word-break: break-all;')
 
-            self.fin_count = ui.label('').style('margin-top: 8px;')
-            self.confidence = ui.label('').classes('app-muted')
-            self.size_label = ui.label('').classes('app-muted')
+                    # Status
+                    with ui.element('div').style('display: flex; align-items: center; gap: 8px;'):
+                        ui.label('Statut').classes('app-muted').style('flex-shrink: 0;')
+                        self.status_badge = ui.html('')
 
-            ui.separator().style('margin: 10px 0;')
-            ui.label('Repartition').classes('app-title').style('font-size: 0.95rem;')
-            self.counts_label = ui.label('').classes('app-muted')
+                    ui.separator().style('margin: 0;')
 
-            ui.separator().style('margin: 10px 0;')
-            ui.label('Notes').classes('app-title').style('font-size: 0.95rem;')
-            self.notes = ui.textarea(
-                placeholder='Commentaires sur l\'image',
-                on_change=lambda e: self.state.update_notes(str(e.value or '')),
-            ).props('outlined autogrow dense').classes('w-full')
+                    # Detection stats
+                    with ui.element('div').style('display: flex; flex-direction: column; gap: 4px;'):
+                        ui.label('Détections').classes('app-title').style('font-size: 0.78rem;')
+                        self.fin_count = ui.label('').classes('app-muted')
+                        self.confidence = ui.label('').classes('app-caption')
+                        self.size_label = ui.label('').classes('app-caption')
+
+                    ui.separator().style('margin: 0;')
+
+                    # Queue distribution
+                    with ui.element('div').style('display: flex; flex-direction: column; gap: 6px;'):
+                        ui.label('Répartition').classes('app-title').style('font-size: 0.78rem;')
+                        self.counts_container = ui.element('div').style(
+                            'display: flex; flex-direction: column; gap: 4px;'
+                        )
+
+                    ui.separator().style('margin: 0;')
+
+                    # Notes
+                    with ui.element('div').style('display: flex; flex-direction: column; gap: 6px;'):
+                        ui.label('Notes').classes('app-title').style('font-size: 0.78rem;')
+                        self.notes = ui.textarea(
+                            placeholder="Commentaires sur l'image…",
+                            on_change=lambda e: self.state.update_notes(str(e.value or '')),
+                        ).props('outlined autogrow dense').classes('w-full')
 
         state.subscribe(self.refresh)
         self.refresh()
 
+    def _make_count_row(self, label: str, value: int, dot_cls: str) -> None:
+        with ui.row().classes('items-center gap-2 no-wrap'):
+            ui.html(f'<span class="status-dot {dot_cls}"></span>')
+            ui.label(label).classes('app-muted').style('flex: 1;')
+            ui.label(str(value)).style(
+                'font-size: 0.79rem; font-weight: 600; color: var(--color-text);'
+            )
+
     def refresh(self) -> None:
         image = self.state.current_image
+
         if image is None:
-            self.file_label.text = 'Aucune image'
+            self.file_label.text = 'Aucune image sélectionnée'
             self.path_label.text = ''
             self.status_badge.content = ''
             self.fin_count.text = ''
             self.confidence.text = ''
             self.size_label.text = ''
-            self.counts_label.text = ''
+            self.counts_container.clear()
             self.notes.value = ''
             self.notes.update()
             return
 
-        self.file_label.text = f'Fichier : {image.filename}'
+        self.file_label.text = image.filename
         self.path_label.text = str(image.absolute_path)
+
         badge_class = STATUS_BADGE_CLASS.get(image.status, 'app-badge')
-        self.status_badge.content = f'<span class="{badge_class}">{STATUS_LABEL_FR.get(image.status, "")}</span>'
-        self.fin_count.text = f'Ailerons detectes : {len(image.detections)}'
+        self.status_badge.content = (
+            f'<span class="{badge_class}">'
+            f'{STATUS_LABEL_FR.get(image.status, "")}'
+            f'</span>'
+        )
+
+        n = len(image.detections)
+        self.fin_count.text = f'{n} aileron{"s" if n > 1 else ""} détecté{"s" if n > 1 else ""}'
         if image.detections:
             avg = mean(d.confidence for d in image.detections)
-            self.confidence.text = f'Confiance moyenne : {avg:.2f}'
+            self.confidence.text = f'Confiance moyenne : {avg:.0%}'
         else:
             self.confidence.text = 'Confiance moyenne : -'
         if image.width and image.height:
-            self.size_label.text = f'Dimensions : {image.width} x {image.height}'
+            self.size_label.text = f'Dimensions : {image.width} × {image.height} px'
         else:
             self.size_label.text = 'Dimensions : inconnues'
 
         counts = self.state.counts()
-        self.counts_label.text = (
-            f'En attente : {counts.get(ImageStatus.PENDING, 0)}   '
-            f'Validees : {counts.get(ImageStatus.VALIDATED, 0)}   '
-            f'Rejetees : {counts.get(ImageStatus.REJECTED, 0)}   '
-            f'Modifiees : {counts.get(ImageStatus.MANUAL_EDIT, 0)}'
-        )
+        self.counts_container.clear()
+        with self.counts_container:
+            self._make_count_row('En attente',  counts.get(ImageStatus.PENDING, 0),     'status-dot-pending')
+            self._make_count_row('Validées',    counts.get(ImageStatus.VALIDATED, 0),   'status-dot-validated')
+            self._make_count_row('Rejetées',    counts.get(ImageStatus.REJECTED, 0),    'status-dot-rejected')
+            self._make_count_row('Modifiées',   counts.get(ImageStatus.MANUAL_EDIT, 0), 'status-dot-manual_edit')
+
         if self.notes.value != image.notes:
             self.notes.value = image.notes
             self.notes.update()

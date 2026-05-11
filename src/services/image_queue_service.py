@@ -42,6 +42,10 @@ class ImageQueueService:
         self._images = self._persistence.list_folder(self._folder)
         return self._images
 
+    def clear(self) -> None:
+        self._folder = None
+        self._images = []
+
     def find_index(self, image_id: int) -> int | None:
         for idx, img in enumerate(self._images):
             if img.id == image_id:

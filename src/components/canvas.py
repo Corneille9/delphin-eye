@@ -36,18 +36,27 @@ window.DolphinCanvas = (function() {
         const host = document.getElementById(containerId);
         if (!host) return;
         host.innerHTML = '';
-        state.stage = new Konva.Stage({container: containerId, width: host.clientWidth, height: host.clientHeight, draggable: false});
+        state.stage = new Konva.Stage({
+            container: containerId,
+            width: host.clientWidth,
+            height: host.clientHeight,
+            draggable: false,
+        });
         state.imageLayer = new Konva.Layer();
         state.layer = new Konva.Layer();
         state.stage.add(state.imageLayer);
         state.stage.add(state.layer);
         state.transformer = new Konva.Transformer({
             rotateEnabled: false,
-            anchorStroke: '#1f6feb', anchorFill: '#ffffff', anchorSize: 10,
-            borderStroke: '#1f6feb', borderDash: [4, 2],
+            anchorStroke: '#2563EB',
+            anchorFill: '#ffffff',
+            anchorSize: 10,
+            borderStroke: '#2563EB',
+            borderDash: [4, 2],
         });
         state.layer.add(state.transformer);
 
+        // Zoom
         state.stage.on('wheel', (e) => {
             e.evt.preventDefault();
             const oldScale = state.stage.scaleX();
@@ -70,9 +79,10 @@ window.DolphinCanvas = (function() {
             state.stage.batchDraw();
         });
 
+        // Pan (space + drag or middle button)
         let panning = false, lastPos = null, spaceHeld = false;
         document.addEventListener('keydown', (e) => { if (e.code === 'Space') spaceHeld = true; });
-        document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceHeld = false; });
+        document.addEventListener('keyup',   (e) => { if (e.code === 'Space') spaceHeld = false; });
 
         state.stage.on('mousedown touchstart', (e) => {
             if (state.mode === 'add') {
@@ -81,7 +91,7 @@ window.DolphinCanvas = (function() {
                 state.draftStart = pos;
                 state.draft = new Konva.Rect({
                     x: pos.x, y: pos.y, width: 1, height: 1,
-                    stroke: '#bf8700', strokeWidth: 2, dash: [6, 4],
+                    stroke: '#F59E0B', strokeWidth: 2, dash: [6, 4],
                     strokeScaleEnabled: false,
                 });
                 state.layer.add(state.draft);
@@ -104,7 +114,8 @@ window.DolphinCanvas = (function() {
                 if (!pos) return;
                 const x = Math.min(pos.x, state.draftStart.x);
                 const y = Math.min(pos.y, state.draftStart.y);
-                state.draft.x(x); state.draft.y(y);
+                state.draft.x(x);
+                state.draft.y(y);
                 state.draft.width(Math.abs(pos.x - state.draftStart.x));
                 state.draft.height(Math.abs(pos.y - state.draftStart.y));
                 state.layer.batchDraw();
@@ -113,9 +124,8 @@ window.DolphinCanvas = (function() {
             if (panning) {
                 const pos = state.stage.getPointerPosition();
                 if (!pos || !lastPos) return;
-                const dx = pos.x - lastPos.x, dy = pos.y - lastPos.y;
-                state.stage.x(state.stage.x() + dx);
-                state.stage.y(state.stage.y() + dy);
+                state.stage.x(state.stage.x() + pos.x - lastPos.x);
+                state.stage.y(state.stage.y() + pos.y - lastPos.y);
                 lastPos = pos;
                 state.stage.batchDraw();
             }
@@ -126,7 +136,8 @@ window.DolphinCanvas = (function() {
                 const w = state.draft.width(), h = state.draft.height();
                 const x = state.draft.x(), y = state.draft.y();
                 state.draft.destroy();
-                state.draft = null; state.draftStart = null;
+                state.draft = null;
+                state.draftStart = null;
                 state.mode = 'select';
                 if (w > 5 && h > 5) {
                     state.emit('canvas_add', {x1: x, y1: y, x2: x + w, y2: y + h});
@@ -134,8 +145,16 @@ window.DolphinCanvas = (function() {
                 state.layer.batchDraw();
                 return;
             }
-            panning = false; lastPos = null;
+            panning = false;
+            lastPos = null;
         });
+
+        // Use ResizeObserver for reliable resize handling
+        if (typeof ResizeObserver !== 'undefined') {
+            new ResizeObserver(resizeStage).observe(host);
+        } else {
+            window.addEventListener('resize', resizeStage);
+        }
     }
 
     function getImagePos() {
@@ -147,8 +166,12 @@ window.DolphinCanvas = (function() {
         };
     }
 
+    // Destroy both the rect AND its label to avoid ghost labels on image switch
     function clearBoxes() {
-        state.boxes.forEach((b) => b.destroy());
+        state.boxes.forEach((b) => {
+            if (b._label) b._label.destroy();
+            b.destroy();
+        });
         state.boxes.clear();
         state.transformer.nodes([]);
     }
@@ -157,15 +180,26 @@ window.DolphinCanvas = (function() {
         if (!state.stage) return;
         clearBoxes();
         if (state.imageNode) { state.imageNode.destroy(); state.imageNode = null; }
-        if (!data || !data.url) { state.imageLayer.draw(); state.layer.draw(); return; }
+        if (!data || !data.url) {
+            state.imageLayer.draw();
+            state.layer.draw();
+            return;
+        }
         const img = new Image();
         img.onload = () => {
-            state.imageNode = new Konva.Image({x: 0, y: 0, image: img, width: img.width, height: img.height, listening: true});
+            state.imageNode = new Konva.Image({
+                x: 0, y: 0,
+                image: img,
+                width: img.width,
+                height: img.height,
+                listening: true,
+            });
             state.imageLayer.add(state.imageNode);
             fitToStage(img.width, img.height);
             (data.detections || []).forEach(addBox);
             if (data.selectedId != null) selectBox(data.selectedId);
-            state.imageLayer.draw(); state.layer.draw();
+            state.imageLayer.draw();
+            state.layer.draw();
         };
         img.onerror = () => { state.imageLayer.draw(); };
         img.src = data.url + '?t=' + Date.now();
@@ -175,7 +209,7 @@ window.DolphinCanvas = (function() {
         const host = document.getElementById(state.containerId);
         if (!host) return;
         const sw = host.clientWidth, sh = host.clientHeight;
-        const scale = Math.min(sw / w, sh / h) * 0.98;
+        const scale = Math.min(sw / w, sh / h) * 0.97;
         state.stage.scale({x: scale, y: scale});
         state.stage.position({x: (sw - w * scale) / 2, y: (sh - h * scale) / 2});
         state.scale = scale;
@@ -183,30 +217,47 @@ window.DolphinCanvas = (function() {
     }
 
     function addBox(det) {
+        const isManual = det.source === 'manual';
+        const color = isManual ? '#16A34A' : '#2563EB';
         const rect = new Konva.Rect({
-            x: det.x1, y: det.y1, width: det.x2 - det.x1, height: det.y2 - det.y1,
-            stroke: det.source === 'manual' ? '#0b7285' : '#1f6feb',
-            strokeWidth: 2, strokeScaleEnabled: false, draggable: true,
-            name: 'bbox', id: 'bbox_' + det.local_id,
+            x: det.x1, y: det.y1,
+            width: det.x2 - det.x1,
+            height: det.y2 - det.y1,
+            stroke: color,
+            strokeWidth: 2,
+            strokeScaleEnabled: false,
+            draggable: true,
+            name: 'bbox',
+            id: 'bbox_' + det.local_id,
         });
         rect._detId = det.local_id;
 
-        const label = new Konva.Label({x: det.x1, y: Math.max(0, det.y1 - 18)});
-        label.add(new Konva.Tag({fill: '#1f6feb', cornerRadius: 3}));
+        const conf = ((det.confidence || 1) * 100).toFixed(0);
+        const label = new Konva.Label({x: det.x1, y: Math.max(0, det.y1 - 20)});
+        label.add(new Konva.Tag({fill: color, cornerRadius: 3, opacity: 0.88}));
         label.add(new Konva.Text({
-            text: 'aileron ' + det.local_id + ' (' + (det.confidence || 1).toFixed(2) + ')',
-            padding: 3, fill: '#ffffff', fontSize: 12,
+            text: '#' + det.local_id + '  ' + conf + '%',
+            padding: 3,
+            fill: '#ffffff',
+            fontSize: 11,
+            fontFamily: 'ui-monospace, monospace',
         }));
         label.scale({x: 1 / state.stage.scaleX(), y: 1 / state.stage.scaleY()});
         rect._label = label;
 
         rect.on('click tap', () => selectBox(det.local_id));
+        rect.on('dragmove', () => {
+            if (rect._label) {
+                rect._label.x(rect.x());
+                rect._label.y(Math.max(0, rect.y() - 20 / state.stage.scaleY()));
+            }
+        });
         rect.on('dragend', () => emitUpdate(rect));
         rect.on('transformend', () => {
-            const scaleX = rect.scaleX(), scaleY = rect.scaleY();
-            rect.width(rect.width() * scaleX);
-            rect.height(rect.height() * scaleY);
-            rect.scaleX(1); rect.scaleY(1);
+            rect.width(rect.width() * rect.scaleX());
+            rect.height(rect.height() * rect.scaleY());
+            rect.scaleX(1);
+            rect.scaleY(1);
             emitUpdate(rect);
         });
 
@@ -223,7 +274,7 @@ window.DolphinCanvas = (function() {
         };
         if (rect._label) {
             rect._label.x(payload.x1);
-            rect._label.y(Math.max(0, payload.y1 - 18));
+            rect._label.y(Math.max(0, payload.y1 - 20 / state.stage.scaleY()));
         }
         state.layer.batchDraw();
         state.emit('canvas_update', payload);
@@ -242,15 +293,16 @@ window.DolphinCanvas = (function() {
     }
 
     function setMode(mode) { state.mode = mode; }
+
     function deleteSelected() {
         if (state.selectedId == null) return;
         state.emit('canvas_delete', {local_id: state.selectedId});
     }
+
     function resetView() {
         if (state.imageNode) fitToStage(state.imageNode.width(), state.imageNode.height());
     }
 
-    window.addEventListener('resize', resizeStage);
     return {init, renderImage, setMode, deleteSelected, resetView, selectBox};
 })();
 """
@@ -266,24 +318,69 @@ class CanvasView:
         ui.add_head_html(f'<script src="{KONVA_CDN}"></script>')
         ui.add_head_html(f'<script>{CANVAS_JS}</script>')
 
-        with ui.element('div').classes('app-surface w-full').style(
-            'flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 10px;'
+        # Outer wrapper: flex column so _host grows via flex: 1.
+        # position: relative enables absolute-positioned overlays.
+        with ui.element('div').style(
+            'flex: 1; min-height: 0; '
+            'display: flex; flex-direction: column; '
+            'position: relative; '
+            'background: #0b1120; '
+            'overflow: hidden;'
         ):
-            with ui.row().classes('w-full items-center gap-2').style('margin-bottom: 6px;'):
-                self.title_label = ui.label('').classes('app-title')
-                ui.space()
-                ui.button(icon='center_focus_strong', on_click=self._reset_view) \
-                    .props('flat round dense').tooltip('Recadrer')
-                ui.button(icon='add_box', on_click=self.start_add_mode) \
-                    .props('flat round dense').tooltip('Ajouter une bbox (A)')
+            # Konva host: grows to fill all remaining space in the flex column
             self._host = ui.element('div').style(
-                f'flex: 1; min-height: 400px; background: #0f1720; '
-                f'border-radius: 8px; overflow: hidden; position: relative;'
+                'flex: 1; min-height: 300px;'
             ).props(f'id={self._container_id}')
 
-            self.hint = ui.label(
-                'Clic pour selectionner. Molette pour zoomer. Espace + glisser pour se deplacer.'
-            ).classes('app-muted').style('margin-top: 6px;')
+            # ── Filename overlay (top-left, non-interactive) ─────────────
+            with ui.element('div').style(
+                'position: absolute; top: 10px; left: 10px; z-index: 5; '
+                'pointer-events: none; max-width: 55%;'
+            ):
+                self.title_label = ui.label('').style(
+                    'background: rgba(0,0,0,0.52); '
+                    'color: rgba(255,255,255,0.88); '
+                    'padding: 4px 12px; '
+                    'border-radius: 6px; '
+                    'font-size: 0.79rem; '
+                    'font-weight: 500; '
+                    'overflow: hidden; '
+                    'text-overflow: ellipsis; '
+                    'white-space: nowrap; '
+                    'display: block;'
+                )
+
+            # ── Controls overlay (top-right) ─────────────────────────────
+            with ui.element('div').style(
+                'position: absolute; top: 8px; right: 8px; z-index: 5; '
+                'display: flex; gap: 4px;'
+            ):
+                ui.button(icon='center_focus_strong', on_click=self._reset_view) \
+                    .props('flat round dense') \
+                    .style(
+                        'background: rgba(255,255,255,0.12) !important; '
+                        'color: rgba(255,255,255,0.75) !important;'
+                    ) \
+                    .tooltip('Recadrer')
+
+            # ── Hint overlay (bottom-center, non-interactive) ────────────
+            with ui.element('div').style(
+                'position: absolute; bottom: 8px; left: 50%; '
+                'transform: translateX(-50%); '
+                'z-index: 5; pointer-events: none;'
+            ):
+                ui.label(
+                    'Clic · sélectionner    Molette · zoomer    Espace+glisser · déplacer'
+                ).style(
+                    'background: rgba(0,0,0,0.38); '
+                    'color: rgba(255,255,255,0.45); '
+                    'padding: 3px 12px; '
+                    'border-radius: 6px; '
+                    'font-size: 0.7rem; '
+                    'white-space: nowrap; '
+                    'letter-spacing: 0.01em; '
+                    'display: block;'
+                )
 
         ui.on('canvas_select', self._on_select)
         ui.on('canvas_update', self._on_update)
@@ -318,7 +415,9 @@ class CanvasView:
                     'local_id': d.local_id,
                     'x1': d.x1, 'y1': d.y1, 'x2': d.x2, 'y2': d.y2,
                     'confidence': d.confidence,
-                    'source': d.source.value if isinstance(d.source, DetectionSource) else str(d.source),
+                    'source': (
+                        d.source.value if isinstance(d.source, DetectionSource) else str(d.source)
+                    ),
                 }
                 for d in image.detections
             ],
@@ -329,7 +428,7 @@ class CanvasView:
         if not self._initialized:
             return
         image = self.state.current_image
-        self.title_label.text = image.filename if image else 'Aucune image'
+        self.title_label.text = image.filename if image else ''
         payload = json.dumps(self._build_payload())
         ui.run_javascript(f'window.DolphinCanvas.renderImage({payload});')
 
@@ -337,7 +436,7 @@ class CanvasView:
         if self.state.current_image is None:
             return
         ui.run_javascript("window.DolphinCanvas.setMode('add');")
-        ui.notify('Mode ajout : dessinez une bbox sur l\'image.', type='info')
+        ui.notify('Mode dessin - tracez une bbox sur l\'image.', type='info', timeout=2500)
 
     def delete_selected(self) -> None:
         ui.run_javascript('window.DolphinCanvas.deleteSelected();')
@@ -345,7 +444,7 @@ class CanvasView:
     def _reset_view(self) -> None:
         ui.run_javascript('window.DolphinCanvas.resetView();')
 
-    # -- JS -> Python ----------------------------------------------------
+    # ── JS → Python events ───────────────────────────────────────────────────
 
     def _extract(self, event) -> dict:
         args = getattr(event, 'args', event)

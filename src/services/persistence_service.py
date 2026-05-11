@@ -65,6 +65,9 @@ class PersistenceService:
             )
         return records
 
+    def clear_folder(self, folder: Path) -> None:
+        self._repo.clear_folder(str(folder.resolve()))
+
     def update_status(self, image: ImageRecord) -> None:
         self._repo.update_image_status(image.id, image.status.value)
 

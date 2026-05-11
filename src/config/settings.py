@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Iterable
-import json
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -45,12 +44,12 @@ class Settings:
 
     def ensure_directories(self) -> None:
         for path in (
-            self.output_dir,
-            self.validated_dir,
-            self.rejected_dir,
-            self.crops_dir,
-            self.annotations_dir,
-            self.database_path.parent,
+                self.output_dir,
+                self.validated_dir,
+                self.rejected_dir,
+                self.crops_dir,
+                self.annotations_dir,
+                self.database_path.parent,
         ):
             path.mkdir(parents=True, exist_ok=True)
 
@@ -94,7 +93,7 @@ class Settings:
 _SETTINGS: Settings | None = None
 
 
-def get_settings() -> Settings:
+def get_settings() -> Settings | None:
     global _SETTINGS
     if _SETTINGS is None:
         _SETTINGS = Settings()
