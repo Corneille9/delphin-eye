@@ -1,10 +1,14 @@
 # for optimale training
 
-from ultralytics import YOLO
+import os
 from pathlib import Path
+from ultralytics import YOLO
 
-DATA_YAML = str(Path.cwd().parent / "data" / "data.yaml")
-OUTPUT_RUNS = str(Path.cwd().parent / "output" / "models")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+os.chdir(PROJECT_ROOT)
+
+DATA_YAML = str(PROJECT_ROOT / "data" / "data.yaml")
+OUTPUT_RUNS = str(PROJECT_ROOT / "output" / "models")
 
 model = YOLO("yolo26s.pt")
 
