@@ -21,6 +21,21 @@ from services.prediction_service import PredictionService
 
 
 def _pick_folder_native() -> str | None:
+    import platform
+    import subprocess
+
+    if platform.system() == 'Linux':
+        for cmd in (
+            ['zenity', '--file-selection', '--directory', "--title=Choisir un dossier d'images"],
+            ['kdialog', '--getexistingdirectory', Path.home().as_posix()],
+        ):
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                if result.returncode == 0:
+                    return result.stdout.strip() or None
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                continue
+
     try:
         import tkinter as tk
         from tkinter import filedialog
@@ -52,7 +67,7 @@ def register_dashboard_page(image_url_builder) -> None:
         state = _build_state()
         state.try_resume()
 
-        settings_dialog = SettingsDialog()
+        settings_dialog = SettingsDialog(state)
 
         # ── Folder dialog (fallback when no native picker) ────────────
         def manual_folder_dialog() -> None:
@@ -97,7 +112,7 @@ def register_dashboard_page(image_url_builder) -> None:
 
         def on_run_detection() -> None:
             if state.total == 0:
-                ui.notify('Chargez d\'abord un dossier.', type='warning')
+                ui.notify("Chargez d'abord un dossier.", type='warning')
                 return
             if not state.prediction.model_available():
                 ui.notify(f'Modèle YOLO introuvable : {settings.model_path}', type='negative')
@@ -110,7 +125,6 @@ def register_dashboard_page(image_url_builder) -> None:
                 state.notify()
 
             def on_finished(processed: int) -> None:
-                state.queue.refresh()
                 state.notify()
                 ui.notify(f'Détection terminée : {processed} images traitées.', type='positive')
 
@@ -118,18 +132,23 @@ def register_dashboard_page(image_url_builder) -> None:
             state.run_detection(on_update, on_finished)
 
         def on_export() -> None:
-            if state.total == 0:
-                ui.notify('Rien à exporter.', type='warning')
+            if state.export_running or state.prediction.running:
                 return
-            try:
-                summary = state.export.export_all(state.images)
-                ui.notify(
-                    f"Export OK : {summary['validated']} validées, "
-                    f"{summary['rejected']} rejetées - {summary['output_dir']}",
-                    type='positive',
-                )
-            except Exception as exc:
-                ui.notify(f'Erreur export : {exc}', type='negative')
+            detected = sum(1 for img in state.images if img.will_export)
+            if detected == 0:
+                ui.notify('Aucune image avec ailerons détectés à exporter.', type='warning')
+                return
+
+            def on_done(summary: dict) -> None:
+                if 'error' in summary:
+                    ui.notify(f"Erreur export : {summary['error']}", type='negative')
+                    return
+                msg = f"{summary['exported']} image(s) exportée(s) → {summary['triees_dir']}"
+                if summary['corrections']:
+                    msg += f"  |  {summary['corrections']} correction(s) → {summary['corrections_dir']}"
+                ui.notify(msg, type='positive')
+
+            state.run_export_async(on_done)
 
         # ── Layout ────────────────────────────────────────────────────
         with ui.element('div').style(
@@ -145,14 +164,12 @@ def register_dashboard_page(image_url_builder) -> None:
                 on_open_settings=settings_dialog.open,
             )
 
-            # Plain div (not ui.row) to avoid Quasar q-gutter negative margins
             with ui.element('div').style(
                 'flex: 1; min-height: 0; '
                 'display: flex; flex-direction: row; gap: 8px;'
             ):
                 Sidebar(state)
 
-                # Center: canvas + toolbar as one unified card
                 with ui.element('div').classes('app-surface').style(
                     'flex: 1; min-width: 0; min-height: 0; overflow: hidden; '
                     'display: flex; flex-direction: column;'
@@ -174,13 +191,9 @@ def register_dashboard_page(image_url_builder) -> None:
                 state.previous_image()
             elif event.key.arrow_right:
                 state.next_image()
-            elif event.key.enter:
-                state.validate_current()
             elif event.key.delete:
                 canvas.delete_selected()
             elif getattr(event.key, 'name', '') == 'a' or event.key == 'a':
                 canvas.start_add_mode()
-            elif getattr(event.key, 'name', '') == 'r' or event.key == 'r':
-                state.reject_current()
 
         ui.keyboard(on_key=on_key)

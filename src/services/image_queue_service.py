@@ -29,7 +29,7 @@ class ImageQueueService:
         if not folder.is_dir():
             raise NotADirectoryError(str(folder))
         files = sorted(
-            p for p in folder.iterdir()
+            p for p in folder.rglob('*')
             if p.is_file() and p.suffix.lower() in self._settings.supported_formats
         )
         self._images = self._persistence.register_folder(folder, files)

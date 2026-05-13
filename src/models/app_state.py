@@ -34,6 +34,7 @@ class AppState:
         self.current_index: int = 0
         self.selected_detection_index: int | None = None
         self.detection_progress: tuple[int, int] = (0, 0)
+        self.export_running: bool = False
         self._listeners: list[Listener] = []
 
     # -- observer --------------------------------------------------------
@@ -183,27 +184,7 @@ class AppState:
         return det
 
     def _mark_manual(self, image: ImageRecord) -> None:
-        if image.status in (ImageStatus.PENDING, ImageStatus.PROCESSED):
-            image.status = ImageStatus.MANUAL_EDIT
-
-    # -- validation ------------------------------------------------------
-
-    def validate_current(self) -> None:
-        image = self.current_image
-        if image is None:
-            return
-        image.status = ImageStatus.VALIDATED
-        self.persistence.update_status(image)
-        self.persistence.save_detections(image)
-        self.next_image()
-
-    def reject_current(self) -> None:
-        image = self.current_image
-        if image is None:
-            return
-        image.status = ImageStatus.REJECTED
-        self.persistence.update_status(image)
-        self.next_image()
+        image.status = ImageStatus.MODIFIED
 
     def update_notes(self, text: str) -> None:
         image = self.current_image
@@ -220,6 +201,9 @@ class AppState:
         on_finished: Callable[[int], None],
         only_pending: bool = True,
     ) -> None:
+        import asyncio
+        loop = asyncio.get_event_loop()
+
         images = list(self.queue.images)
         total = sum(1 for i in images if not only_pending or i.status == ImageStatus.PENDING)
         self.detection_progress = (0, total)
@@ -227,13 +211,42 @@ class AppState:
 
         def progress(done: int, total_: int, _img: ImageRecord) -> None:
             self.detection_progress = (done, total_)
-            on_update()
+            loop.call_soon_threadsafe(on_update)
 
         def done(processed: int) -> None:
-            self.queue.refresh()
-            on_finished(processed)
+            def _finish() -> None:
+                self.queue.refresh()
+                on_finished(processed)
+            loop.call_soon_threadsafe(_finish)
 
         self.prediction.run_batch_async(images, progress, done, only_pending=only_pending)
 
     def cancel_detection(self) -> None:
         self.prediction.cancel()
+
+    # -- export ----------------------------------------------------------
+
+    def run_export_async(self, on_done: Callable[[dict], None]) -> None:
+        import asyncio
+        import threading
+        loop = asyncio.get_event_loop()
+        self.export_running = True
+        self.notify()
+
+        images = list(self.queue.images)
+
+        def worker() -> None:
+            try:
+                result = self.export.export_all(images)
+            except Exception as exc:
+                result = {'error': str(exc)}
+            finally:
+                self.export_running = False
+
+            def _finish() -> None:
+                self.notify()
+                on_done(result)
+
+            loop.call_soon_threadsafe(_finish)
+
+        threading.Thread(target=worker, daemon=True).start()

@@ -3,16 +3,15 @@ from __future__ import annotations
 from nicegui import ui
 
 from models.app_state import AppState
-from models.entities import ImageStatus, STATUS_LABEL_FR
+from models.entities import ImageRecord, ImageStatus, STATUS_LABEL_FR
 
 
-_STATUS_DOT = {
-    ImageStatus.PENDING:     'status-dot status-dot-pending',
-    ImageStatus.VALIDATED:   'status-dot status-dot-validated',
-    ImageStatus.REJECTED:    'status-dot status-dot-rejected',
-    ImageStatus.MANUAL_EDIT: 'status-dot status-dot-manual_edit',
-    ImageStatus.PROCESSED:   'status-dot status-dot-processed',
-}
+def _dot_cls(image: ImageRecord) -> str:
+    if not image.has_detections:
+        return 'status-dot status-dot-none'
+    if image.status == ImageStatus.MODIFIED:
+        return 'status-dot status-dot-manual_edit'
+    return 'status-dot status-dot-detected'
 
 
 class Sidebar:
@@ -34,11 +33,10 @@ class Sidebar:
 
                 self.filter = ui.select(
                     options={
-                        'all': 'Toutes les images',
-                        'pending': 'En attente',
-                        'validated': 'Validées',
-                        'rejected': 'Rejetées',
-                        'manual_edit': 'Modifiées',
+                        'all':      'Toutes les images',
+                        'pending':  'En attente',
+                        'detected': 'Détectées',
+                        'modified': 'Modifiées',
                     },
                     value='all',
                     on_change=lambda _: self.refresh(),
@@ -73,7 +71,7 @@ class Sidebar:
 
                 for index, image in visible:
                     is_active = index == self.state.current_index
-                    dot_cls = _STATUS_DOT.get(image.status, 'status-dot')
+                    dot = _dot_cls(image)
                     tip = STATUS_LABEL_FR.get(image.status, image.status.value)
 
                     row = ui.element('div').classes(
@@ -82,7 +80,7 @@ class Sidebar:
                     row.on('click', lambda _e, i=index: self.state.select_image(i))
 
                     with row:
-                        ui.html(f'<span class="{dot_cls}" title="{tip}"></span>')
+                        ui.html(f'<span class="{dot}" title="{tip}"></span>')
                         ui.label(image.filename).style(
                             'flex: 1; min-width: 0; overflow: hidden; '
                             'text-overflow: ellipsis; white-space: nowrap;'

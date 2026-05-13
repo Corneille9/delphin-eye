@@ -64,9 +64,11 @@ class TopBar:
                     'Détecter', icon='play_arrow', on_click=on_run_detection
                 ).props('no-caps color=primary unelevated padding="7px 16px"').style('color: white;')
 
-                ui.button('Exporter', icon='file_download', on_click=on_export) \
-                    .props('no-caps flat dense padding="6px 14px"') \
+                self.export_btn = (
+                    ui.button('Exporter', icon='file_download', on_click=on_export)
+                    .props('no-caps flat dense padding="6px 14px"')
                     .classes('app-outline')
+                )
 
                 ui.button(icon='settings', on_click=on_open_settings) \
                     .props('flat round dense') \
@@ -103,7 +105,22 @@ class TopBar:
             self.folder_btn.props('icon=folder_off')
             self.folder_btn.classes(remove='app-outline', add='app-ghost-danger')
 
+        busy = self.state.prediction.running or self.state.export_running
+
         if self.state.prediction.running:
             self.run_button.props('loading')
         else:
             self.run_button.props(remove='loading')
+        if busy:
+            self.run_button.disable()
+        else:
+            self.run_button.enable()
+
+        if self.state.export_running:
+            self.export_btn.props('loading')
+        else:
+            self.export_btn.props(remove='loading')
+        if busy:
+            self.export_btn.disable()
+        else:
+            self.export_btn.enable()

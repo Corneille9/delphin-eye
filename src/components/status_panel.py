@@ -33,7 +33,7 @@ class StatusPanel:
                         )
                         self.path_label = ui.label('').classes('app-caption').style('word-break: break-all;')
 
-                    # Status
+                    # Status badge
                     with ui.element('div').style('display: flex; align-items: center; gap: 8px;'):
                         ui.label('Statut').classes('app-muted').style('flex-shrink: 0;')
                         self.status_badge = ui.html('')
@@ -69,7 +69,7 @@ class StatusPanel:
         state.subscribe(self.refresh)
         self.refresh()
 
-    def _make_count_row(self, label: str, value: int, dot_cls: str) -> None:
+    def _count_row(self, label: str, value: int, dot_cls: str) -> None:
         with ui.row().classes('items-center gap-2 no-wrap'):
             ui.html(f'<span class="status-dot {dot_cls}"></span>')
             ui.label(label).classes('app-muted').style('flex: 1;')
@@ -95,11 +95,9 @@ class StatusPanel:
         self.file_label.text = image.filename
         self.path_label.text = str(image.absolute_path)
 
-        badge_class = STATUS_BADGE_CLASS.get(image.status, 'app-badge')
+        badge_cls = STATUS_BADGE_CLASS.get(image.status, 'app-badge')
         self.status_badge.content = (
-            f'<span class="{badge_class}">'
-            f'{STATUS_LABEL_FR.get(image.status, "")}'
-            f'</span>'
+            f'<span class="{badge_cls}">{STATUS_LABEL_FR.get(image.status, "")}</span>'
         )
 
         n = len(image.detections)
@@ -108,19 +106,28 @@ class StatusPanel:
             avg = mean(d.confidence for d in image.detections)
             self.confidence.text = f'Confiance moyenne : {avg:.0%}'
         else:
-            self.confidence.text = 'Confiance moyenne : -'
+            self.confidence.text = 'Confiance moyenne : —'
         if image.width and image.height:
             self.size_label.text = f'Dimensions : {image.width} × {image.height} px'
         else:
             self.size_label.text = 'Dimensions : inconnues'
 
         counts = self.state.counts()
+        to_export = sum(1 for img in self.state.images if img.will_export)
+
         self.counts_container.clear()
         with self.counts_container:
-            self._make_count_row('En attente',  counts.get(ImageStatus.PENDING, 0),     'status-dot-pending')
-            self._make_count_row('Validées',    counts.get(ImageStatus.VALIDATED, 0),   'status-dot-validated')
-            self._make_count_row('Rejetées',    counts.get(ImageStatus.REJECTED, 0),    'status-dot-rejected')
-            self._make_count_row('Modifiées',   counts.get(ImageStatus.MANUAL_EDIT, 0), 'status-dot-manual_edit')
+            self._count_row('En attente',  counts.get(ImageStatus.PENDING, 0),  'status-dot-none')
+            self._count_row('Détectées',   counts.get(ImageStatus.DETECTED, 0), 'status-dot-detected')
+            self._count_row('Modifiées',   counts.get(ImageStatus.MODIFIED, 0), 'status-dot-manual_edit')
+            ui.separator().style('margin: 4px 0;')
+            with ui.row().classes('items-center gap-2 no-wrap'):
+                ui.label('À exporter').style(
+                    'flex: 1; font-size: 0.79rem; font-weight: 600; color: var(--color-text);'
+                )
+                ui.label(str(to_export)).style(
+                    'font-size: 0.79rem; font-weight: 700; color: var(--color-primary);'
+                )
 
         if self.notes.value != image.notes:
             self.notes.value = image.notes

@@ -50,29 +50,16 @@ class ActionToolbar:
 
                 ui.element('div').classes('toolbar-sep')
 
-                # ── Validation (Quasar color prop = uses --q-positive / --q-negative) ──
-                ui.button('Valider', icon='check', on_click=state.validate_current) \
-                    .props('no-caps dense color=positive unelevated padding="6px 14px"') \
-                    .style('color: white;') \
-                    .tooltip('Entrée')
-
-                ui.button('Rejeter', icon='close', on_click=state.reject_current) \
-                    .props('no-caps dense color=negative unelevated padding="6px 14px"') \
-                    .style('color: white;') \
-                    .tooltip('R')
-
-                ui.element('div').classes('toolbar-sep')
-
                 # ── BBox editing ───────────────────────────────────────
                 ui.button('Ajouter bbox', icon='add_box', on_click=on_add_box) \
                     .props('flat no-caps dense padding="6px 12px"') \
                     .classes('app-outline') \
-                    .tooltip('A - mode dessin')
+                    .tooltip('A · glissez sur l\'image pour dessiner')
 
                 ui.button(icon='delete_outline', on_click=on_delete_box) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
-                    .tooltip('Suppr - supprimer la bbox sélectionnée')
+                    .tooltip('Suppr · supprimer la bbox sélectionnée')
 
         state.subscribe(self.refresh)
         self.refresh()
@@ -87,5 +74,5 @@ class ActionToolbar:
             idx = self.state.current_index + 1
             total = self.state.total
             n = len(image.detections)
-            det_str = f'  ·  {n} bbox{"s" if n > 1 else ""}' if n else ''
+            det_str = f'  ·  {n} bbox{"s" if n > 1 else ""}' if n else '  ·  aucun aileron'
             self.index_label.text = f'Image {idx} / {total}{det_str}'

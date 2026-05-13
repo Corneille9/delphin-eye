@@ -116,11 +116,14 @@ body {
     border-radius: 50%;
     flex-shrink: 0;
 }
-.status-dot-pending     { background: #F59E0B; }
-.status-dot-processed   { background: #8B5CF6; }
+.status-dot-none        { background: #CBD5E1; }
+.status-dot-detected    { background: #22C55E; }
+.status-dot-manual_edit { background: #3B82F6; }
+/* legacy names kept for any remaining references */
+.status-dot-pending     { background: #CBD5E1; }
+.status-dot-processed   { background: #22C55E; }
 .status-dot-validated   { background: #22C55E; }
 .status-dot-rejected    { background: #EF4444; }
-.status-dot-manual_edit { background: #3B82F6; }
 
 /* ── Queue items ────────────────────────────────── */
 .app-queue-item {
