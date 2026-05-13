@@ -213,6 +213,7 @@ data/predict/
 output/predictions/
 src/database/app.db
 .idea/
+data.zip
 
 yolo26n.pt
 yolo26n/
