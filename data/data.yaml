@@ -1,4 +1,4 @@
-path: ../data
+path: data # or ../data if we want to use form notebook
 
 train: processed/train
 val: processed/val
