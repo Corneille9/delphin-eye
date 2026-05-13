@@ -6,42 +6,48 @@ from pathlib import Path
 
 
 class ImageStatus(str, Enum):
-    PENDING = 'pending'
-    VALIDATED = 'validated'
-    REJECTED = 'rejected'
-    MANUAL_EDIT = 'manual_edit'
-    PROCESSED = 'processed'
+    PENDING  = 'pending'   # not yet run through the model
+    DETECTED = 'detected'  # model found at least one fin
+    MODIFIED = 'modified'  # user added or removed bboxes manually
+
+
+# Graceful migration: old status values stored in the DB before the refactor.
+STATUS_COMPAT: dict[str, ImageStatus] = {
+    'validated':   ImageStatus.DETECTED,
+    'rejected':    ImageStatus.PENDING,
+    'processed':   ImageStatus.DETECTED,
+    'manual_edit': ImageStatus.MODIFIED,
+}
+
+
+def parse_status(value: str) -> ImageStatus:
+    try:
+        return ImageStatus(value)
+    except ValueError:
+        return STATUS_COMPAT.get(value, ImageStatus.PENDING)
 
 
 class DetectionSource(str, Enum):
-    AUTO = 'auto'
+    AUTO   = 'auto'
     MANUAL = 'manual'
 
 
-STATUS_ICON = {
-    ImageStatus.PENDING: '?',
-    ImageStatus.VALIDATED: 'OK',
-    ImageStatus.REJECTED: 'X',
-    ImageStatus.MANUAL_EDIT: 'M',
-    ImageStatus.PROCESSED: '.',
+STATUS_ICON: dict[ImageStatus, str] = {
+    ImageStatus.PENDING:  '·',
+    ImageStatus.DETECTED: '✓',
+    ImageStatus.MODIFIED: 'M',
 }
 
-
-STATUS_LABEL_FR = {
-    ImageStatus.PENDING: 'En attente',
-    ImageStatus.VALIDATED: 'Validee',
-    ImageStatus.REJECTED: 'Rejetee',
-    ImageStatus.MANUAL_EDIT: 'Modifiee',
-    ImageStatus.PROCESSED: 'Traitee',
+STATUS_LABEL_FR: dict[ImageStatus, str] = {
+    ImageStatus.PENDING:  'En attente',
+    ImageStatus.DETECTED: 'Analysée',
+    ImageStatus.MODIFIED: 'Modifiée',
 }
 
-
-STATUS_BADGE_CLASS = {
-    ImageStatus.PENDING: 'app-badge app-badge-pending',
-    ImageStatus.VALIDATED: 'app-badge app-badge-validated',
-    ImageStatus.REJECTED: 'app-badge app-badge-rejected',
-    ImageStatus.MANUAL_EDIT: 'app-badge app-badge-manual',
-    ImageStatus.PROCESSED: 'app-badge app-badge-manual',
+STATUS_BADGE_CLASS: dict[ImageStatus, str] = {
+    ImageStatus.PENDING:  'app-badge app-badge-pending',
+    ImageStatus.DETECTED: 'app-badge app-badge-validated',
+    ImageStatus.MODIFIED: 'app-badge app-badge-manual',
 }
 
 
@@ -93,3 +99,7 @@ class ImageRecord:
     @property
     def has_detections(self) -> bool:
         return bool(self.detections)
+
+    @property
+    def will_export(self) -> bool:
+        return self.has_detections

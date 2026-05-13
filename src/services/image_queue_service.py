@@ -29,7 +29,7 @@ class ImageQueueService:
         if not folder.is_dir():
             raise NotADirectoryError(str(folder))
         files = sorted(
-            p for p in folder.iterdir()
+            p for p in folder.rglob('*')
             if p.is_file() and p.suffix.lower() in self._settings.supported_formats
         )
         self._images = self._persistence.register_folder(folder, files)
@@ -41,6 +41,10 @@ class ImageQueueService:
             return []
         self._images = self._persistence.list_folder(self._folder)
         return self._images
+
+    def clear(self) -> None:
+        self._folder = None
+        self._images = []
 
     def find_index(self, image_id: int) -> int | None:
         for idx, img in enumerate(self._images):

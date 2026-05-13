@@ -39,7 +39,7 @@ class PredictionService:
                 return self._model
             if not self.model_available():
                 raise FileNotFoundError(
-                    f"Modele YOLO introuvable : {self._settings.model_path}"
+                    f"Modèle YOLO introuvable : {self._settings.model_path}"
                 )
             from ultralytics import YOLO  # lazy import
             self._model = YOLO(str(self._settings.model_path))
@@ -92,7 +92,7 @@ class PredictionService:
 
         def worker() -> None:
             processed = 0
-            targets = [img for img in images if not only_pending or img.status == ImageStatus.PENDING]
+            targets = [img for img in images if not only_pending or img.status in (ImageStatus.PENDING, ImageStatus.DETECTED)]
             total = len(targets)
             try:
                 for img in targets:
@@ -103,8 +103,7 @@ class PredictionService:
                     except Exception:
                         dets = []
                     img.detections = dets
-                    if img.status == ImageStatus.PENDING:
-                        img.status = ImageStatus.PROCESSED
+                    img.status = ImageStatus.DETECTED
                     self._persistence.save_detections(img)
                     self._persistence.update_status(img)
                     processed += 1
