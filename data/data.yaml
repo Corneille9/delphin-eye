@@ -1,4 +1,4 @@
-path: /home/corneille/Github/delphin-eye/data
+path: ../data
 
 train: processed/train
 val: processed/val

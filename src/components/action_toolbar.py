@@ -51,7 +51,7 @@ class ActionToolbar:
                 ui.element('div').classes('toolbar-sep')
 
                 # ── BBox editing ───────────────────────────────────────
-                ui.button('Ajouter bbox', icon='add_box', on_click=on_add_box) \
+                ui.button('Ajouter aileron', icon='add_box', on_click=on_add_box) \
                     .props('flat no-caps dense padding="6px 12px"') \
                     .classes('app-outline') \
                     .tooltip('A · glissez sur l\'image pour dessiner')
@@ -59,7 +59,7 @@ class ActionToolbar:
                 ui.button(icon='delete_outline', on_click=on_delete_box) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
-                    .tooltip('Suppr · supprimer la bbox sélectionnée')
+                    .tooltip('Suppr · supprimer l\'aileron sélectionné')
 
         state.subscribe(self.refresh)
         self.refresh()
@@ -74,5 +74,5 @@ class ActionToolbar:
             idx = self.state.current_index + 1
             total = self.state.total
             n = len(image.detections)
-            det_str = f'  ·  {n} bbox{"s" if n > 1 else ""}' if n else '  ·  aucun aileron'
+            det_str = f'  ·  {n} aileron{"s" if n > 1 else ""}' if n else '  ·  aucun aileron'
             self.index_label.text = f'Image {idx} / {total}{det_str}'

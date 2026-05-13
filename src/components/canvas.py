@@ -29,7 +29,7 @@ class CanvasView:
                     events=['mousedown', 'mousemove', 'mouseup'],
                     sanitize=False,
                 )
-                .style('max-width: 100%; max-height: 100%; object-fit: contain; display: block;')
+                .style('max-width: 100%; max-height: 100%;')
             )
             self._draft_layer = self._img.add_layer()
 
@@ -136,10 +136,24 @@ class CanvasView:
             return
 
         if image.id != self._current_image_id:
+            if image.width is None or image.height is None:
+                try:
+                    from PIL import Image as PILImage
+                    with PILImage.open(str(image.absolute_path)) as pil:
+                        image.width, image.height = pil.size
+                        self.state.persistence.update_dimensions(image)
+                except Exception:
+                    pass
+
             self._img.set_source(self._image_url(image.id))
             self._current_image_id = image.id
             self._draw_start = None
             self._draft_layer.content = ''
+
+            style = 'max-width: 100%; max-height: 100%;'
+            if image.width and image.height:
+                style += f' aspect-ratio: {image.width} / {image.height};'
+            self._img.style(style)
 
         self._img.content = self._build_svg(image)
 
@@ -202,7 +216,7 @@ class CanvasView:
     def start_add_mode(self) -> None:
         if self.state.current_image is None:
             return
-        ui.notify('Glissez directement sur l\'image pour ajouter une bbox.', type='info', timeout=2000)
+        ui.notify('Glissez directement sur l\'image pour ajouter un aileron.', type='info', timeout=2000)
 
     def delete_selected(self) -> None:
         image = self.state.current_image
