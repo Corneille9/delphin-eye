@@ -1,0 +1,31 @@
+Rapports academique plan
+Parge de garde
+Resumé (Début ou a la fin )
+Table des Matière
+Table des figure
+Liste des Accronyme
+Introduction Générale
+    * Context
+    * Problematique
+    * Objectifs
+Etat de l'art
+Materiel et Methode
+    Materiel
+        Data utiliser
+        Lociel utiliser
+        Zone etude
+    Methodologie
+        Methode 1
+        Methode 2
+Résultat
+    Description des Résultat
+Analyse de résulta (Discussion):
+    Analyse de résultat et comparaison(toujours justifier)
+Conclusion
+    On rappel les points suivant
+        * Context
+        * Objectifs
+    Conclusion
+    Perspective
+Bibliographie
+Annexe
