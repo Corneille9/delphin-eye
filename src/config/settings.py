@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
-import json
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -14,45 +13,21 @@ class Settings:
     project_root: Path = PROJECT_ROOT
     model_path: Path = PROJECT_ROOT / 'output' / 'models' / 'default' / 'weights' / 'best.pt'
     database_path: Path = PROJECT_ROOT / 'src' / 'database' / 'app.db'
-    output_dir: Path = PROJECT_ROOT / 'output'
-    validated_dir: Path = PROJECT_ROOT / 'output' / 'validated_images'
-    rejected_dir: Path = PROJECT_ROOT / 'output' / 'rejected'
-    crops_dir: Path = PROJECT_ROOT / 'output' / 'cropped_fins'
-    annotations_dir: Path = PROJECT_ROOT / 'output' / 'annotations'
 
     supported_formats: tuple[str, ...] = ('.jpg', '.jpeg', '.png', '.webp')
-    autosave_interval_seconds: int = 5
-    max_image_side: int = 1600
     inference_imgsz: int = 640
     inference_conf: float = 0.25
+    crop_margin: int = 100
 
     user_config_path: Path = PROJECT_ROOT / 'config' / 'user_settings.json'
 
     _overridable_fields: tuple[str, ...] = field(
-        default=(
-            'model_path',
-            'output_dir',
-            'validated_dir',
-            'rejected_dir',
-            'crops_dir',
-            'annotations_dir',
-            'autosave_interval_seconds',
-            'inference_imgsz',
-            'inference_conf',
-        ),
+        default=('model_path', 'inference_imgsz', 'inference_conf', 'crop_margin'),
         repr=False,
     )
 
     def ensure_directories(self) -> None:
-        for path in (
-            self.output_dir,
-            self.validated_dir,
-            self.rejected_dir,
-            self.crops_dir,
-            self.annotations_dir,
-            self.database_path.parent,
-        ):
-            path.mkdir(parents=True, exist_ok=True)
+        self.database_path.parent.mkdir(parents=True, exist_ok=True)
 
     def model_available(self) -> bool:
         return self.model_path.exists()
@@ -68,7 +43,9 @@ class Settings:
             if key not in data:
                 continue
             value = data[key]
-            current = getattr(self, key)
+            current = getattr(self, key, None)
+            if current is None:
+                continue
             if isinstance(current, Path):
                 setattr(self, key, Path(value))
             else:
@@ -78,17 +55,14 @@ class Settings:
         keys = tuple(keys) if keys is not None else self._overridable_fields
         payload: dict[str, object] = {}
         for key in keys:
-            value = getattr(self, key)
+            value = getattr(self, key, None)
+            if value is None:
+                continue
             payload[key] = str(value) if isinstance(value, Path) else value
         self.user_config_path.parent.mkdir(parents=True, exist_ok=True)
         self.user_config_path.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False), encoding='utf-8'
         )
-
-    def as_dict(self) -> dict[str, object]:
-        data = asdict(self)
-        data.pop('_overridable_fields', None)
-        return {k: str(v) if isinstance(v, Path) else v for k, v in data.items()}
 
 
 _SETTINGS: Settings | None = None

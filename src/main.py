@@ -42,9 +42,9 @@ def main() -> None:
     register_dashboard_page(image_url_builder=_build_image_url)
 
     ui.run(
-        title='Dolphin Fin Sorter',
+        title='Delphin Eye',
         reload=False,
-        favicon='/assets/placeholder.svg',
+        favicon=str(base_dir / 'assets/favicon.ico'),
     )
 
 

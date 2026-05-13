@@ -1,0 +1,6 @@
+{
+  "model_path": "/home/corneille/Github/delphin-eye/output/models/default/weights/best.pt",
+  "inference_imgsz": 640,
+  "inference_conf": 0.25,
+  "crop_margin": 300
+}
