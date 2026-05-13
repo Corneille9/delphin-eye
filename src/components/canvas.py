@@ -1,390 +1,213 @@
 from __future__ import annotations
 
-import json
-import uuid
-from typing import Any
+import time
+from typing import Callable
 
-from nicegui import ui
+from nicegui import events, ui
 
 from models.app_state import AppState
-from models.entities import DetectionSource
-
-
-KONVA_CDN = 'https://unpkg.com/konva@9/konva.min.js'
-
-
-CANVAS_JS = r"""
-window.DolphinCanvas = (function() {
-    const state = {
-        stage: null, layer: null, imageLayer: null, imageNode: null,
-        transformer: null, boxes: new Map(), scale: 1, mode: 'select',
-        draft: null, draftStart: null, selectedId: null,
-        emit: null, containerId: null,
-    };
-
-    function resizeStage() {
-        const host = document.getElementById(state.containerId);
-        if (!host || !state.stage) return;
-        state.stage.width(host.clientWidth);
-        state.stage.height(host.clientHeight);
-        state.stage.batchDraw();
-    }
-
-    function init(containerId, emit) {
-        state.containerId = containerId;
-        state.emit = emit;
-        const host = document.getElementById(containerId);
-        if (!host) return;
-        host.innerHTML = '';
-        state.stage = new Konva.Stage({container: containerId, width: host.clientWidth, height: host.clientHeight, draggable: false});
-        state.imageLayer = new Konva.Layer();
-        state.layer = new Konva.Layer();
-        state.stage.add(state.imageLayer);
-        state.stage.add(state.layer);
-        state.transformer = new Konva.Transformer({
-            rotateEnabled: false,
-            anchorStroke: '#1f6feb', anchorFill: '#ffffff', anchorSize: 10,
-            borderStroke: '#1f6feb', borderDash: [4, 2],
-        });
-        state.layer.add(state.transformer);
-
-        state.stage.on('wheel', (e) => {
-            e.evt.preventDefault();
-            const oldScale = state.stage.scaleX();
-            const pointer = state.stage.getPointerPosition();
-            if (!pointer) return;
-            const mousePointTo = {
-                x: (pointer.x - state.stage.x()) / oldScale,
-                y: (pointer.y - state.stage.y()) / oldScale,
-            };
-            const direction = e.evt.deltaY > 0 ? -1 : 1;
-            const factor = 1.12;
-            const newScale = direction > 0 ? oldScale * factor : oldScale / factor;
-            const clamped = Math.max(0.1, Math.min(8, newScale));
-            state.stage.scale({x: clamped, y: clamped});
-            state.stage.position({
-                x: pointer.x - mousePointTo.x * clamped,
-                y: pointer.y - mousePointTo.y * clamped,
-            });
-            state.scale = clamped;
-            state.stage.batchDraw();
-        });
-
-        let panning = false, lastPos = null, spaceHeld = false;
-        document.addEventListener('keydown', (e) => { if (e.code === 'Space') spaceHeld = true; });
-        document.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceHeld = false; });
-
-        state.stage.on('mousedown touchstart', (e) => {
-            if (state.mode === 'add') {
-                const pos = getImagePos();
-                if (!pos) return;
-                state.draftStart = pos;
-                state.draft = new Konva.Rect({
-                    x: pos.x, y: pos.y, width: 1, height: 1,
-                    stroke: '#bf8700', strokeWidth: 2, dash: [6, 4],
-                    strokeScaleEnabled: false,
-                });
-                state.layer.add(state.draft);
-                return;
-            }
-            if (spaceHeld || e.evt.button === 1) {
-                panning = true;
-                lastPos = state.stage.getPointerPosition();
-                e.evt.preventDefault();
-                return;
-            }
-            if (e.target === state.stage || e.target === state.imageNode) {
-                selectBox(null);
-            }
-        });
-
-        state.stage.on('mousemove touchmove', () => {
-            if (state.mode === 'add' && state.draft && state.draftStart) {
-                const pos = getImagePos();
-                if (!pos) return;
-                const x = Math.min(pos.x, state.draftStart.x);
-                const y = Math.min(pos.y, state.draftStart.y);
-                state.draft.x(x); state.draft.y(y);
-                state.draft.width(Math.abs(pos.x - state.draftStart.x));
-                state.draft.height(Math.abs(pos.y - state.draftStart.y));
-                state.layer.batchDraw();
-                return;
-            }
-            if (panning) {
-                const pos = state.stage.getPointerPosition();
-                if (!pos || !lastPos) return;
-                const dx = pos.x - lastPos.x, dy = pos.y - lastPos.y;
-                state.stage.x(state.stage.x() + dx);
-                state.stage.y(state.stage.y() + dy);
-                lastPos = pos;
-                state.stage.batchDraw();
-            }
-        });
-
-        state.stage.on('mouseup touchend', () => {
-            if (state.mode === 'add' && state.draft) {
-                const w = state.draft.width(), h = state.draft.height();
-                const x = state.draft.x(), y = state.draft.y();
-                state.draft.destroy();
-                state.draft = null; state.draftStart = null;
-                state.mode = 'select';
-                if (w > 5 && h > 5) {
-                    state.emit('canvas_add', {x1: x, y1: y, x2: x + w, y2: y + h});
-                }
-                state.layer.batchDraw();
-                return;
-            }
-            panning = false; lastPos = null;
-        });
-    }
-
-    function getImagePos() {
-        const pointer = state.stage.getPointerPosition();
-        if (!pointer) return null;
-        return {
-            x: (pointer.x - state.stage.x()) / state.stage.scaleX(),
-            y: (pointer.y - state.stage.y()) / state.stage.scaleY(),
-        };
-    }
-
-    function clearBoxes() {
-        state.boxes.forEach((b) => b.destroy());
-        state.boxes.clear();
-        state.transformer.nodes([]);
-    }
-
-    function renderImage(data) {
-        if (!state.stage) return;
-        clearBoxes();
-        if (state.imageNode) { state.imageNode.destroy(); state.imageNode = null; }
-        if (!data || !data.url) { state.imageLayer.draw(); state.layer.draw(); return; }
-        const img = new Image();
-        img.onload = () => {
-            state.imageNode = new Konva.Image({x: 0, y: 0, image: img, width: img.width, height: img.height, listening: true});
-            state.imageLayer.add(state.imageNode);
-            fitToStage(img.width, img.height);
-            (data.detections || []).forEach(addBox);
-            if (data.selectedId != null) selectBox(data.selectedId);
-            state.imageLayer.draw(); state.layer.draw();
-        };
-        img.onerror = () => { state.imageLayer.draw(); };
-        img.src = data.url + '?t=' + Date.now();
-    }
-
-    function fitToStage(w, h) {
-        const host = document.getElementById(state.containerId);
-        if (!host) return;
-        const sw = host.clientWidth, sh = host.clientHeight;
-        const scale = Math.min(sw / w, sh / h) * 0.98;
-        state.stage.scale({x: scale, y: scale});
-        state.stage.position({x: (sw - w * scale) / 2, y: (sh - h * scale) / 2});
-        state.scale = scale;
-        state.stage.batchDraw();
-    }
-
-    function addBox(det) {
-        const rect = new Konva.Rect({
-            x: det.x1, y: det.y1, width: det.x2 - det.x1, height: det.y2 - det.y1,
-            stroke: det.source === 'manual' ? '#0b7285' : '#1f6feb',
-            strokeWidth: 2, strokeScaleEnabled: false, draggable: true,
-            name: 'bbox', id: 'bbox_' + det.local_id,
-        });
-        rect._detId = det.local_id;
-
-        const label = new Konva.Label({x: det.x1, y: Math.max(0, det.y1 - 18)});
-        label.add(new Konva.Tag({fill: '#1f6feb', cornerRadius: 3}));
-        label.add(new Konva.Text({
-            text: 'aileron ' + det.local_id + ' (' + (det.confidence || 1).toFixed(2) + ')',
-            padding: 3, fill: '#ffffff', fontSize: 12,
-        }));
-        label.scale({x: 1 / state.stage.scaleX(), y: 1 / state.stage.scaleY()});
-        rect._label = label;
-
-        rect.on('click tap', () => selectBox(det.local_id));
-        rect.on('dragend', () => emitUpdate(rect));
-        rect.on('transformend', () => {
-            const scaleX = rect.scaleX(), scaleY = rect.scaleY();
-            rect.width(rect.width() * scaleX);
-            rect.height(rect.height() * scaleY);
-            rect.scaleX(1); rect.scaleY(1);
-            emitUpdate(rect);
-        });
-
-        state.layer.add(rect);
-        state.layer.add(label);
-        state.boxes.set(det.local_id, rect);
-    }
-
-    function emitUpdate(rect) {
-        const payload = {
-            local_id: rect._detId,
-            x1: rect.x(), y1: rect.y(),
-            x2: rect.x() + rect.width(), y2: rect.y() + rect.height(),
-        };
-        if (rect._label) {
-            rect._label.x(payload.x1);
-            rect._label.y(Math.max(0, payload.y1 - 18));
-        }
-        state.layer.batchDraw();
-        state.emit('canvas_update', payload);
-    }
-
-    function selectBox(localId) {
-        state.selectedId = localId;
-        if (localId == null) {
-            state.transformer.nodes([]);
-        } else {
-            const box = state.boxes.get(localId);
-            if (box) state.transformer.nodes([box]);
-        }
-        state.layer.batchDraw();
-        state.emit('canvas_select', {local_id: localId});
-    }
-
-    function setMode(mode) { state.mode = mode; }
-    function deleteSelected() {
-        if (state.selectedId == null) return;
-        state.emit('canvas_delete', {local_id: state.selectedId});
-    }
-    function resetView() {
-        if (state.imageNode) fitToStage(state.imageNode.width(), state.imageNode.height());
-    }
-
-    window.addEventListener('resize', resizeStage);
-    return {init, renderImage, setMode, deleteSelected, resetView, selectBox};
-})();
-"""
+from models.entities import DetectionSource, ImageRecord
 
 
 class CanvasView:
-    def __init__(self, state: AppState, image_url_builder) -> None:
+    def __init__(self, state: AppState, image_url_builder: Callable[[int], str]) -> None:
         self.state = state
         self._image_url = image_url_builder
-        self._container_id = f'dolphin-canvas-{uuid.uuid4().hex[:8]}'
-        self._initialized = False
+        self._draw_start: tuple[float, float] | None = None
+        self._current_image_id: int | None = None
+        self._last_move: float = 0.0
 
-        ui.add_head_html(f'<script src="{KONVA_CDN}"></script>')
-        ui.add_head_html(f'<script>{CANVAS_JS}</script>')
-
-        with ui.element('div').classes('app-surface w-full').style(
-            'flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 10px;'
+        with ui.element('div').style(
+            'flex: 1; min-height: 0; '
+            'display: flex; align-items: center; justify-content: center; '
+            'position: relative; background: #0b1120; overflow: hidden;'
         ):
-            with ui.row().classes('w-full items-center gap-2').style('margin-bottom: 6px;'):
-                self.title_label = ui.label('').classes('app-title')
-                ui.space()
-                ui.button(icon='center_focus_strong', on_click=self._reset_view) \
-                    .props('flat round dense').tooltip('Recadrer')
-                ui.button(icon='add_box', on_click=self.start_add_mode) \
-                    .props('flat round dense').tooltip('Ajouter une bbox (A)')
-            self._host = ui.element('div').style(
-                f'flex: 1; min-height: 400px; background: #0f1720; '
-                f'border-radius: 8px; overflow: hidden; position: relative;'
-            ).props(f'id={self._container_id}')
+            self._img = (
+                ui.interactive_image(
+                    source='',
+                    on_mouse=self._on_mouse,
+                    events=['mousedown', 'mousemove', 'mouseup'],
+                    sanitize=False,
+                )
+                .style('max-width: 100%; max-height: 100%; object-fit: contain; display: block;')
+            )
+            self._draft_layer = self._img.add_layer()
 
-            self.hint = ui.label(
-                'Clic pour selectionner. Molette pour zoomer. Espace + glisser pour se deplacer.'
-            ).classes('app-muted').style('margin-top: 6px;')
+            with self._img:
+                self.title_label = (
+                    ui.label('')
+                    .classes('absolute top-0 left-0 m-2')
+                    .style(
+                        'background: rgba(0,0,0,0.52); color: rgba(255,255,255,0.88); '
+                        'padding: 4px 12px; border-radius: 6px; font-size: 0.79rem; '
+                        'font-weight: 500; pointer-events: none; '
+                        'max-width: 55%; overflow: hidden; '
+                        'text-overflow: ellipsis; white-space: nowrap;'
+                    )
+                )
 
-        ui.on('canvas_select', self._on_select)
-        ui.on('canvas_update', self._on_update)
-        ui.on('canvas_delete', self._on_delete)
-        ui.on('canvas_add', self._on_add)
+            self._empty_hint = (
+                ui.label('Sélectionnez un dossier pour commencer')
+                .style(
+                    'position: absolute; color: rgba(255,255,255,0.22); '
+                    'font-size: 0.9rem; pointer-events: none;'
+                )
+            )
 
         state.subscribe(self.refresh)
-        ui.timer(0.2, self._bootstrap, once=True)
-
-    def _bootstrap(self) -> None:
-        ui.run_javascript(
-            f"window.DolphinCanvas.init('{self._container_id}', "
-            f"(name, payload) => window.emitEvent(name, payload));"
-        )
-        self._initialized = True
         self.refresh()
 
-    def _build_payload(self) -> dict[str, Any]:
-        image = self.state.current_image
-        if image is None:
-            return {'url': None, 'detections': [], 'selectedId': None}
-        selected = None
-        if (
-            self.state.selected_detection_index is not None
-            and 0 <= self.state.selected_detection_index < len(image.detections)
-        ):
-            selected = image.detections[self.state.selected_detection_index].local_id
-        return {
-            'url': self._image_url(image.id),
-            'detections': [
-                {
-                    'local_id': d.local_id,
-                    'x1': d.x1, 'y1': d.y1, 'x2': d.x2, 'y2': d.y2,
-                    'confidence': d.confidence,
-                    'source': d.source.value if isinstance(d.source, DetectionSource) else str(d.source),
-                }
-                for d in image.detections
-            ],
-            'selectedId': selected,
-        }
+    # ── Scale helpers ──────────────────────────────────────────────────────────
+
+    def _spx(self, target_screen_px: float, image: ImageRecord | None) -> float:
+        """Convert a target screen-pixel size to SVG coordinate units.
+
+        The SVG viewport matches the image's natural dimensions, so elements
+        must be sized in image pixels. We assume the panel is ~800 CSS px wide
+        to derive the conversion factor; the result looks reasonable across
+        typical display widths (600–1200 px).
+        """
+        image_w = image.width if (image and image.width) else 1920
+        return target_screen_px * image_w / 800.0
+
+    # ── Mouse events ───────────────────────────────────────────────────────────
+
+    def _on_mouse(self, e: events.MouseEventArguments) -> None:
+        if e.type == 'mousedown':
+            image = self.state.current_image
+            if image is None:
+                return
+            idx = self._hit_test(e.image_x, e.image_y, image)
+            if idx is not None:
+                self.state.select_detection(idx)
+            else:
+                self.state.select_detection(None)
+                self._draw_start = (e.image_x, e.image_y)
+
+        elif e.type == 'mousemove':
+            if self._draw_start:
+                now = time.time()
+                if now - self._last_move < 0.04:
+                    return
+                self._last_move = now
+                x1 = min(self._draw_start[0], e.image_x)
+                y1 = min(self._draw_start[1], e.image_y)
+                w = abs(e.image_x - self._draw_start[0])
+                h = abs(e.image_y - self._draw_start[1])
+                self._draft_layer.content = (
+                    f'<rect x="{x1:.1f}" y="{y1:.1f}" width="{w:.1f}" height="{h:.1f}" '
+                    f'fill="rgba(245,158,11,0.08)" stroke="#F59E0B" '
+                    f'stroke-width="2" stroke-dasharray="8 4" '
+                    f'vector-effect="non-scaling-stroke" '
+                    f'pointer-events="none"/>'
+                )
+
+        elif e.type == 'mouseup':
+            if self._draw_start:
+                x1 = min(self._draw_start[0], e.image_x)
+                y1 = min(self._draw_start[1], e.image_y)
+                x2 = max(self._draw_start[0], e.image_x)
+                y2 = max(self._draw_start[1], e.image_y)
+                self._draw_start = None
+                self._draft_layer.content = ''
+                if x2 - x1 > 5 and y2 - y1 > 5:
+                    self.state.add_manual_detection(x1, y1, x2, y2)
+
+    def _hit_test(self, x: float, y: float, image: ImageRecord) -> int | None:
+        """Return detection index if (x, y) falls inside a box, else None."""
+        for idx, det in enumerate(image.detections):
+            if det.x1 <= x <= det.x2 and det.y1 <= y <= det.y2:
+                return idx
+        return None
+
+    # ── State refresh ──────────────────────────────────────────────────────────
 
     def refresh(self) -> None:
-        if not self._initialized:
-            return
         image = self.state.current_image
-        self.title_label.text = image.filename if image else 'Aucune image'
-        payload = json.dumps(self._build_payload())
-        ui.run_javascript(f'window.DolphinCanvas.renderImage({payload});')
+        self.title_label.text = image.filename if image else ''
+        self._empty_hint.set_visibility(image is None)
+
+        if image is None:
+            if self._current_image_id is not None:
+                self._img.set_source('')
+                self._img.content = ''
+                self._draft_layer.content = ''
+                self._current_image_id = None
+            return
+
+        if image.id != self._current_image_id:
+            self._img.set_source(self._image_url(image.id))
+            self._current_image_id = image.id
+            self._draw_start = None
+            self._draft_layer.content = ''
+
+        self._img.content = self._build_svg(image)
+
+    # ── SVG overlay ────────────────────────────────────────────────────────────
+
+    def _build_svg(self, image: ImageRecord) -> str:
+        if not image.detections:
+            return ''
+
+        # Box borders use vector-effect="non-scaling-stroke" so stroke-width
+        # is always in screen pixels regardless of the image's natural size.
+        # Label/text dimensions use _spx() to convert screen px → SVG units.
+        px = lambda n: self._spx(n, image)
+        fs = px(12)       # font-size  → 12 screen px
+        lh = px(20)       # label height → 20 screen px
+        pad = px(5)       # padding → 5 screen px
+
+        selected_idx = self.state.selected_detection_index
+        parts: list[str] = []
+
+        for i, det in enumerate(image.detections):
+            is_selected = (i == selected_idx)
+            is_manual = (
+                det.source == DetectionSource.MANUAL
+                or (hasattr(det.source, 'value') and det.source.value == 'manual')
+            )
+            color = '#16A34A' if is_manual else '#2563EB'
+            stroke = '#F59E0B' if is_selected else color
+            stroke_w = 3 if is_selected else 2
+            dash = 'stroke-dasharray="8 4"' if is_selected else ''
+
+            conf = int((det.confidence or 1.0) * 100)
+            lbl = f'#{det.local_id} {conf}%'
+            lw = len(lbl) * fs * 0.63 + pad * 2
+
+            x1, y1, x2, y2 = det.x1, det.y1, det.x2, det.y2
+            w, h = x2 - x1, y2 - y1
+            ly = max(0.0, y1 - lh - px(2))
+
+            parts.append(
+                f'<rect x="{x1:.1f}" y="{y1:.1f}" width="{w:.1f}" height="{h:.1f}" '
+                f'fill="none" stroke="{stroke}" stroke-width="{stroke_w}" {dash} '
+                f'vector-effect="non-scaling-stroke" '
+                f'pointer-events="none" rx="{px(2):.1f}"/>'
+            )
+            parts.append(
+                f'<rect x="{x1:.1f}" y="{ly:.1f}" width="{lw:.1f}" height="{lh:.1f}" '
+                f'fill="{color}" rx="{px(2):.1f}" opacity="0.88" pointer-events="none"/>'
+            )
+            parts.append(
+                f'<text x="{x1 + pad:.1f}" y="{ly + lh - pad:.1f}" '
+                f'font-size="{fs:.1f}" font-family="ui-monospace,monospace" '
+                f'fill="white" pointer-events="none">{lbl}</text>'
+            )
+
+        return ''.join(parts)
+
+    # ── Public API (called by ActionToolbar and keyboard shortcuts) ────────────
 
     def start_add_mode(self) -> None:
         if self.state.current_image is None:
             return
-        ui.run_javascript("window.DolphinCanvas.setMode('add');")
-        ui.notify('Mode ajout : dessinez une bbox sur l\'image.', type='info')
+        ui.notify('Glissez directement sur l\'image pour ajouter une bbox.', type='info', timeout=2000)
 
     def delete_selected(self) -> None:
-        ui.run_javascript('window.DolphinCanvas.deleteSelected();')
-
-    def _reset_view(self) -> None:
-        ui.run_javascript('window.DolphinCanvas.resetView();')
-
-    # -- JS -> Python ----------------------------------------------------
-
-    def _extract(self, event) -> dict:
-        args = getattr(event, 'args', event)
-        if isinstance(args, list) and args:
-            args = args[0]
-        return args if isinstance(args, dict) else {}
-
-    def _on_select(self, event) -> None:
-        data = self._extract(event)
-        local_id = data.get('local_id')
         image = self.state.current_image
-        if image is None:
+        if image is None or self.state.selected_detection_index is None:
             return
-        if local_id is None:
-            self.state.select_detection(None)
-            return
-        for idx, d in enumerate(image.detections):
-            if d.local_id == local_id:
-                self.state.select_detection(idx)
-                return
-
-    def _on_update(self, event) -> None:
-        data = self._extract(event)
-        if 'local_id' not in data:
-            return
-        self.state.update_detection_box(
-            int(data['local_id']),
-            float(data['x1']), float(data['y1']),
-            float(data['x2']), float(data['y2']),
-        )
-
-    def _on_delete(self, event) -> None:
-        data = self._extract(event)
-        if 'local_id' in data:
-            self.state.delete_detection(int(data['local_id']))
-
-    def _on_add(self, event) -> None:
-        data = self._extract(event)
-        self.state.add_manual_detection(
-            float(data.get('x1', 0)), float(data.get('y1', 0)),
-            float(data.get('x2', 0)), float(data.get('y2', 0)),
-        )
+        idx = self.state.selected_detection_index
+        if 0 <= idx < len(image.detections):
+            self.state.delete_detection(image.detections[idx].local_id)

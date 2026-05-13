@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from database import Repository, get_repository
-from models.entities import Detection, DetectionSource, ImageRecord, ImageStatus
+from models.entities import Detection, DetectionSource, ImageRecord, ImageStatus, parse_status
 
 
 class PersistenceService:
@@ -56,7 +56,7 @@ class PersistenceService:
                     absolute_path=Path(row['absolute_path']),
                     folder=row['folder'],
                     order_index=row['order_index'],
-                    status=ImageStatus(row['status']),
+                    status=parse_status(row['status']),
                     notes=row['notes'] or '',
                     width=row['width'],
                     height=row['height'],
@@ -64,6 +64,9 @@ class PersistenceService:
                 )
             )
         return records
+
+    def clear_folder(self, folder: Path) -> None:
+        self._repo.clear_folder(str(folder.resolve()))
 
     def update_status(self, image: ImageRecord) -> None:
         self._repo.update_image_status(image.id, image.status.value)
