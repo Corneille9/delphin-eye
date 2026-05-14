@@ -25,8 +25,8 @@ echo "==> Création du virtualenv dans $VENV_DIR..."
 "$PYTHON" -m venv "$VENV_DIR"
 
 echo "==> Installation des dépendances..."
-"$VENV_DIR/bin/pip" install --upgrade pip --quiet
-"$VENV_DIR/bin/pip" install -r requirements.txt --quiet
+"$VENV_DIR/bin/pip" install --upgrade pip
+"$VENV_DIR/bin/pip" install -r requirements.txt
 
 echo ""
 echo "Installation terminée."
