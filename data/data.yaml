@@ -1,4 +1,4 @@
-path: data # or ../data if we want to use form notebook
+path: C://src/projects/school/etude_recherche/delphin-eye/data
 
 train: processed/train
 val: processed/val
