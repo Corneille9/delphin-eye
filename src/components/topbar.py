@@ -10,25 +10,24 @@ from models.app_state import AppState
 
 class TopBar:
     def __init__(
-        self,
-        state: AppState,
-        on_select_folder: Callable[[], None],
-        on_reset_folder: Callable[[], None],
-        on_run_detection: Callable[[], None],
-        on_export: Callable[[], None],
-        on_open_settings: Callable[[], None],
+            self,
+            state: AppState,
+            on_select_folder: Callable[[], None],
+            on_reset_folder: Callable[[], None],
+            on_run_detection: Callable[[], None],
+            on_export: Callable[[], None],
+            on_open_settings: Callable[[], None],
     ) -> None:
         self.state = state
         self._on_select_folder = on_select_folder
         self._on_reset_folder = on_reset_folder
 
         with ui.element('div').classes('app-surface').style(
-            'flex-shrink: 0; padding: 10px 16px;'
+                'flex-shrink: 0; padding: 10px 16px;'
         ):
             with ui.row().classes('w-full items-center gap-3 no-wrap'):
-
                 with ui.element('div').style(
-                    'display: flex; align-items: center; gap: 7px; flex-shrink: 0;'
+                        'display: flex; align-items: center; gap: 7px; flex-shrink: 0;'
                 ):
                     ui.icon('water').style('font-size: 1.3rem; color: var(--color-primary);')
                     ui.label('Delphin Eye').classes('app-brand')
@@ -45,7 +44,7 @@ class TopBar:
                 ui.space()
 
                 with ui.element('div').classes('app-hide-md').style(
-                    'display: flex; align-items: center; gap: 8px; flex-shrink: 0;'
+                        'display: flex; align-items: center; gap: 8px; flex-shrink: 0;'
                 ):
                     self.progress = ui.linear_progress(value=0.0, show_value=False).style(
                         'width: 110px; height: 6px;'

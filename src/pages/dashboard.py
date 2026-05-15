@@ -26,8 +26,8 @@ def _pick_folder_native() -> str | None:
 
     if platform.system() == 'Linux':
         for cmd in (
-            ['zenity', '--file-selection', '--directory', "--title=Choisir un dossier d'images"],
-            ['kdialog', '--getexistingdirectory', Path.home().as_posix()],
+                ['zenity', '--file-selection', '--directory', "--title=Choisir un dossier d'images"],
+                ['kdialog', '--getexistingdirectory', Path.home().as_posix()],
         ):
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -67,9 +67,10 @@ def register_dashboard_page(image_url_builder) -> None:
         state = _build_state()
         state.try_resume()
 
+        _client = ui.context.client  # captured here so background callbacks can restore slot context
+
         settings_dialog = SettingsDialog(state)
 
-        # ── Folder dialog (fallback when no native picker) ────────────
         def manual_folder_dialog() -> None:
             with ui.dialog() as dialog, ui.card().style('min-width: 460px;'):
                 ui.label('Chemin du dossier').classes('app-title').style('margin-bottom: 8px;')
@@ -126,7 +127,8 @@ def register_dashboard_page(image_url_builder) -> None:
 
             def on_finished(processed: int) -> None:
                 state.notify()
-                ui.notify(f'Détection terminée : {processed} images traitées.', type='positive')
+                with _client:
+                    ui.notify(f'Détection terminée : {processed} images traitées.', type='positive')
 
             ui.notify('Détection démarrée en arrière-plan…', type='info')
             state.run_detection(on_update, on_finished)
@@ -140,20 +142,20 @@ def register_dashboard_page(image_url_builder) -> None:
                 return
 
             def on_done(summary: dict) -> None:
-                if 'error' in summary:
-                    ui.notify(f"Erreur export : {summary['error']}", type='negative')
-                    return
-                msg = f"{summary['exported']} image(s) exportée(s) → {summary['triees_dir']}"
-                if summary['corrections']:
-                    msg += f"  |  {summary['corrections']} correction(s) → {summary['corrections_dir']}"
-                ui.notify(msg, type='positive')
+                with _client:
+                    if 'error' in summary:
+                        ui.notify(f"Erreur export : {summary['error']}", type='negative')
+                        return
+                    msg = f"{summary['exported']} image(s) exportée(s) → {summary['triees_dir']}"
+                    if summary['corrections']:
+                        msg += f"  |  {summary['corrections']} correction(s) → {summary['corrections_dir']}"
+                    ui.notify(msg, type='positive')
 
             state.run_export_async(on_done)
 
-        # ── Layout ────────────────────────────────────────────────────
         with ui.element('div').style(
-            'width: 100%; height: 100vh; overflow: hidden; '
-            'display: flex; flex-direction: column; gap: 8px; padding: 8px;'
+                'width: 100%; height: 100vh; overflow: hidden; '
+                'display: flex; flex-direction: column; gap: 8px; padding: 8px;'
         ):
             TopBar(
                 state,
@@ -165,14 +167,14 @@ def register_dashboard_page(image_url_builder) -> None:
             )
 
             with ui.element('div').style(
-                'flex: 1; min-height: 0; '
-                'display: flex; flex-direction: row; gap: 8px;'
+                    'flex: 1; min-height: 0; '
+                    'display: flex; flex-direction: row; gap: 8px;'
             ):
                 Sidebar(state)
 
                 with ui.element('div').classes('app-surface').style(
-                    'flex: 1; min-width: 0; min-height: 0; overflow: hidden; '
-                    'display: flex; flex-direction: column;'
+                        'flex: 1; min-width: 0; min-height: 0; overflow: hidden; '
+                        'display: flex; flex-direction: column;'
                 ):
                     canvas = CanvasView(state, image_url_builder=image_url_builder)
                     ActionToolbar(
@@ -183,7 +185,6 @@ def register_dashboard_page(image_url_builder) -> None:
 
                 StatusPanel(state)
 
-        # ── Keyboard shortcuts ────────────────────────────────────────
         def on_key(event: events.KeyEventArguments) -> None:
             if not event.action.keydown:
                 return

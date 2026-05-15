@@ -60,7 +60,6 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ── Surfaces ───────────────────────────────────── */
 .app-surface {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -68,7 +67,6 @@ body {
     box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
 }
 
-/* ── Typography ─────────────────────────────────── */
 .app-brand {
     font-size: 1rem;
     font-weight: 700;
@@ -91,7 +89,6 @@ body {
     line-height: 1.3;
 }
 
-/* ── Status badges ──────────────────────────────── */
 .app-badge {
     display: inline-flex;
     align-items: center;
@@ -108,7 +105,6 @@ body {
 .app-badge-rejected  { background: #FEE2E2; color: #991B1B; }
 .app-badge-manual    { background: #DBEAFE; color: #1E40AF; }
 
-/* ── Status dots (queue) ────────────────────────── */
 .status-dot {
     display: inline-block;
     width: 7px;
@@ -125,7 +121,6 @@ body {
 .status-dot-validated   { background: #22C55E; }
 .status-dot-rejected    { background: #EF4444; }
 
-/* ── Queue items ────────────────────────────────── */
 .app-queue-item {
     cursor: pointer;
     padding: 6px 10px;
@@ -145,11 +140,9 @@ body {
     font-weight: 600;
 }
 
-/* ── Buttons: uniform border-radius ────────────────
-   Round buttons keep 50%; all others get 8px.      */
+
 .q-btn:not(.q-btn--round) { border-radius: 8px !important; }
 
-/* ── Flat/ghost style (no bg, muted text) ────────── */
 .q-btn.app-ghost {
     color: var(--color-muted) !important;
 }
@@ -158,7 +151,6 @@ body {
     color: var(--color-text) !important;
 }
 
-/* ── Outline style (bordered, no fill) ───────────── */
 .q-btn.app-outline {
     border: 1.5px solid var(--color-border) !important;
     color: var(--color-text) !important;
@@ -166,7 +158,6 @@ body {
 }
 .q-btn.app-outline:hover { background: #F8FAFC !important; }
 
-/* ── Toolbar divider ────────────────────────────── */
 .toolbar-sep {
     width: 1px;
     height: 22px;
@@ -175,13 +166,11 @@ body {
     align-self: center;
 }
 
-/* ── Scrollbars ─────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
 
-/* ── Responsive ─────────────────────────────────── */
 @media (max-width: 1100px) {
     .app-hide-md { display: none !important; }
 }

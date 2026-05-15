@@ -13,19 +13,15 @@ class StatusPanel:
         self.state = state
 
         with ui.element('div').classes('app-surface app-hide-md').style(
-            'width: 280px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;'
+                'width: 280px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;'
         ):
-            # ── Header ───────────────────────────────────────
             with ui.element('div').style(
-                'padding: 12px 14px 10px; border-bottom: 1px solid var(--color-border); flex-shrink: 0;'
+                    'padding: 12px 14px 10px; border-bottom: 1px solid var(--color-border); flex-shrink: 0;'
             ):
                 ui.label('Informations').classes('app-title')
 
-            # ── Content (scrollable) ─────────────────────────
             with ui.scroll_area().style('flex: 1; min-height: 0;'):
                 with ui.element('div').style('padding: 12px 14px; display: flex; flex-direction: column; gap: 12px;'):
-
-                    # Image info block
                     with ui.element('div').style('display: flex; flex-direction: column; gap: 4px;'):
                         self.file_label = ui.label('').style(
                             'font-size: 0.82rem; font-weight: 600; color: var(--color-text); '
@@ -117,9 +113,9 @@ class StatusPanel:
 
         self.counts_container.clear()
         with self.counts_container:
-            self._count_row('En attente',  counts.get(ImageStatus.PENDING, 0),  'status-dot-none')
-            self._count_row('Détectées',   counts.get(ImageStatus.DETECTED, 0), 'status-dot-detected')
-            self._count_row('Modifiées',   counts.get(ImageStatus.MODIFIED, 0), 'status-dot-manual_edit')
+            self._count_row('En attente', counts.get(ImageStatus.PENDING, 0), 'status-dot-none')
+            self._count_row('Détectées', counts.get(ImageStatus.DETECTED, 0), 'status-dot-detected')
+            self._count_row('Modifiées', counts.get(ImageStatus.MODIFIED, 0), 'status-dot-manual_edit')
             ui.separator().style('margin: 4px 0;')
             with ui.row().classes('items-center gap-2 no-wrap'):
                 ui.label('À exporter').style(

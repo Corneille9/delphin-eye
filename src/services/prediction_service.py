@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import threading
-from pathlib import Path
 from typing import Callable
 
 from config import get_settings
 from models.entities import Detection, DetectionSource, ImageRecord, ImageStatus
 from services.persistence_service import PersistenceService
-
 
 ProgressCallback = Callable[[int, int, ImageRecord], None]
 DoneCallback = Callable[[int], None]

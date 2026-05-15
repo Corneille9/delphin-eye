@@ -9,25 +9,23 @@ from models.app_state import AppState
 
 class ActionToolbar:
     def __init__(
-        self,
-        state: AppState,
-        on_add_box: Callable[[], None],
-        on_delete_box: Callable[[], None],
+            self,
+            state: AppState,
+            on_add_box: Callable[[], None],
+            on_delete_box: Callable[[], None],
     ) -> None:
         self.state = state
 
         with ui.element('div').style(
-            'flex-shrink: 0; '
-            'padding: 8px 14px; '
-            'border-top: 1px solid var(--color-border); '
-            'background: var(--color-surface);'
+                'flex-shrink: 0; '
+                'padding: 8px 14px; '
+                'border-top: 1px solid var(--color-border); '
+                'background: var(--color-surface);'
         ):
             with ui.row().classes('w-full items-center gap-2 no-wrap'):
-
-                # ── Image info (left) ──────────────────────────────────
                 with ui.element('div').style(
-                    'flex: 0 1 220px; min-width: 0; '
-                    'display: flex; flex-direction: column; justify-content: center;'
+                        'flex: 0 1 220px; min-width: 0; '
+                        'display: flex; flex-direction: column; justify-content: center;'
                 ):
                     self.image_label = ui.label('Aucune image').style(
                         'font-size: 0.79rem; font-weight: 600; color: var(--color-text); '
@@ -37,20 +35,18 @@ class ActionToolbar:
 
                 ui.space()
 
-                # ── Navigation ─────────────────────────────────────────
                 ui.button(icon='chevron_left', on_click=state.previous_image) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
-                    .tooltip('← Image précédente')
+                    .tooltip('Image précédente')
 
                 ui.button(icon='chevron_right', on_click=state.next_image) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
-                    .tooltip('→ Image suivante')
+                    .tooltip('Image suivante')
 
                 ui.element('div').classes('toolbar-sep')
 
-                # ── BBox editing ───────────────────────────────────────
                 ui.button('Ajouter aileron', icon='add_box', on_click=on_add_box) \
                     .props('flat no-caps dense padding="6px 12px"') \
                     .classes('app-outline') \

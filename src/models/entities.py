@@ -6,16 +6,16 @@ from pathlib import Path
 
 
 class ImageStatus(str, Enum):
-    PENDING  = 'pending'   # not yet run through the model
+    PENDING = 'pending'  # not yet run through the model
     DETECTED = 'detected'  # model found at least one fin
     MODIFIED = 'modified'  # user added or removed bboxes manually
 
 
 # Graceful migration: old status values stored in the DB before the refactor.
 STATUS_COMPAT: dict[str, ImageStatus] = {
-    'validated':   ImageStatus.DETECTED,
-    'rejected':    ImageStatus.PENDING,
-    'processed':   ImageStatus.DETECTED,
+    'validated': ImageStatus.DETECTED,
+    'rejected': ImageStatus.PENDING,
+    'processed': ImageStatus.DETECTED,
     'manual_edit': ImageStatus.MODIFIED,
 }
 
@@ -28,24 +28,24 @@ def parse_status(value: str) -> ImageStatus:
 
 
 class DetectionSource(str, Enum):
-    AUTO   = 'auto'
+    AUTO = 'auto'
     MANUAL = 'manual'
 
 
 STATUS_ICON: dict[ImageStatus, str] = {
-    ImageStatus.PENDING:  '·',
+    ImageStatus.PENDING: '·',
     ImageStatus.DETECTED: '✓',
     ImageStatus.MODIFIED: 'M',
 }
 
 STATUS_LABEL_FR: dict[ImageStatus, str] = {
-    ImageStatus.PENDING:  'En attente',
+    ImageStatus.PENDING: 'En attente',
     ImageStatus.DETECTED: 'Analysée',
     ImageStatus.MODIFIED: 'Modifiée',
 }
 
 STATUS_BADGE_CLASS: dict[ImageStatus, str] = {
-    ImageStatus.PENDING:  'app-badge app-badge-pending',
+    ImageStatus.PENDING: 'app-badge app-badge-pending',
     ImageStatus.DETECTED: 'app-badge app-badge-validated',
     ImageStatus.MODIFIED: 'app-badge app-badge-manual',
 }

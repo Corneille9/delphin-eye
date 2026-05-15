@@ -17,7 +17,7 @@ class Settings:
     supported_formats: tuple[str, ...] = ('.jpg', '.jpeg', '.png', '.webp')
     inference_imgsz: int = 640
     inference_conf: float = 0.25
-    crop_margin: int = 100
+    crop_margin: int = 200
 
     user_config_path: Path = PROJECT_ROOT / 'config' / 'user_settings.json'
 

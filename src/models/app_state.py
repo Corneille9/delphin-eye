@@ -9,7 +9,6 @@ from services.image_queue_service import ImageQueueService
 from services.persistence_service import PersistenceService
 from services.prediction_service import PredictionService
 
-
 Listener = Callable[[], None]
 
 
@@ -20,11 +19,11 @@ class AppState:
     LAST_INDEX_KEY = 'last_index'
 
     def __init__(
-        self,
-        persistence: PersistenceService,
-        queue: ImageQueueService,
-        prediction: PredictionService,
-        export: ExportService,
+            self,
+            persistence: PersistenceService,
+            queue: ImageQueueService,
+            prediction: PredictionService,
+            export: ExportService,
     ) -> None:
         self.persistence = persistence
         self.queue = queue
@@ -37,7 +36,6 @@ class AppState:
         self.export_running: bool = False
         self._listeners: list[Listener] = []
 
-    # -- observer --------------------------------------------------------
 
     def subscribe(self, listener: Listener) -> None:
         self._listeners.append(listener)
@@ -48,8 +46,6 @@ class AppState:
                 listener()
             except Exception:
                 pass
-
-    # -- accessors -------------------------------------------------------
 
     @property
     def images(self) -> list[ImageRecord]:
@@ -71,8 +67,6 @@ class AppState:
         for img in self.queue.images:
             result[img.status] = result.get(img.status, 0) + 1
         return result
-
-    # -- folder / resume -------------------------------------------------
 
     def try_resume(self) -> bool:
         folder = self.persistence.get_state(self.LAST_FOLDER_KEY)
@@ -112,8 +106,6 @@ class AppState:
         self.persistence.set_state(self.LAST_INDEX_KEY, '0')
         self.notify()
 
-    # -- navigation ------------------------------------------------------
-
     def select_image(self, index: int) -> None:
         if not self.queue.images:
             return
@@ -127,8 +119,6 @@ class AppState:
 
     def previous_image(self) -> None:
         self.select_image(self.current_index - 1)
-
-    # -- detections ------------------------------------------------------
 
     def select_detection(self, index: int | None) -> None:
         image = self.current_image
@@ -193,13 +183,11 @@ class AppState:
         image.notes = text or ''
         self.persistence.update_notes(image)
 
-    # -- detection run ---------------------------------------------------
-
     def run_detection(
-        self,
-        on_update: Callable[[], None],
-        on_finished: Callable[[int], None],
-        only_pending: bool = True,
+            self,
+            on_update: Callable[[], None],
+            on_finished: Callable[[int], None],
+            only_pending: bool = True,
     ) -> None:
         import asyncio
         loop = asyncio.get_event_loop()
@@ -217,14 +205,13 @@ class AppState:
             def _finish() -> None:
                 self.queue.refresh()
                 on_finished(processed)
+
             loop.call_soon_threadsafe(_finish)
 
         self.prediction.run_batch_async(images, progress, done, only_pending=only_pending)
 
     def cancel_detection(self) -> None:
         self.prediction.cancel()
-
-    # -- export ----------------------------------------------------------
 
     def run_export_async(self, on_done: Callable[[dict], None]) -> None:
         import asyncio

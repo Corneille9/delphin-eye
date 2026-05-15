@@ -18,9 +18,9 @@ class CanvasView:
         self._last_move: float = 0.0
 
         with ui.element('div').style(
-            'flex: 1; min-height: 0; '
-            'display: flex; align-items: center; justify-content: center; '
-            'position: relative; background: #0b1120; overflow: hidden;'
+                'flex: 1; min-height: 0; '
+                'display: flex; align-items: center; justify-content: center; '
+                'position: relative; background: #0b1120; overflow: hidden;'
         ):
             self._img = (
                 ui.interactive_image(
@@ -57,8 +57,6 @@ class CanvasView:
         state.subscribe(self.refresh)
         self.refresh()
 
-    # ── Scale helpers ──────────────────────────────────────────────────────────
-
     def _spx(self, target_screen_px: float, image: ImageRecord | None) -> float:
         """Convert a target screen-pixel size to SVG coordinate units.
 
@@ -69,8 +67,6 @@ class CanvasView:
         """
         image_w = image.width if (image and image.width) else 1920
         return target_screen_px * image_w / 800.0
-
-    # ── Mouse events ───────────────────────────────────────────────────────────
 
     def _on_mouse(self, e: events.MouseEventArguments) -> None:
         if e.type == 'mousedown':
@@ -120,8 +116,6 @@ class CanvasView:
                 return idx
         return None
 
-    # ── State refresh ──────────────────────────────────────────────────────────
-
     def refresh(self) -> None:
         image = self.state.current_image
         self.title_label.text = image.filename if image else ''
@@ -157,8 +151,6 @@ class CanvasView:
 
         self._img.content = self._build_svg(image)
 
-    # ── SVG overlay ────────────────────────────────────────────────────────────
-
     def _build_svg(self, image: ImageRecord) -> str:
         if not image.detections:
             return ''
@@ -167,9 +159,9 @@ class CanvasView:
         # is always in screen pixels regardless of the image's natural size.
         # Label/text dimensions use _spx() to convert screen px → SVG units.
         px = lambda n: self._spx(n, image)
-        fs = px(12)       # font-size  → 12 screen px
-        lh = px(20)       # label height → 20 screen px
-        pad = px(5)       # padding → 5 screen px
+        fs = px(12)  # font-size  → 12 screen px
+        lh = px(20)  # label height → 20 screen px
+        pad = px(5)  # padding → 5 screen px
 
         selected_idx = self.state.selected_detection_index
         parts: list[str] = []
@@ -177,8 +169,8 @@ class CanvasView:
         for i, det in enumerate(image.detections):
             is_selected = (i == selected_idx)
             is_manual = (
-                det.source == DetectionSource.MANUAL
-                or (hasattr(det.source, 'value') and det.source.value == 'manual')
+                    det.source == DetectionSource.MANUAL
+                    or (hasattr(det.source, 'value') and det.source.value == 'manual')
             )
             color = '#16A34A' if is_manual else '#2563EB'
             stroke = '#F59E0B' if is_selected else color
@@ -210,8 +202,6 @@ class CanvasView:
             )
 
         return ''.join(parts)
-
-    # ── Public API (called by ActionToolbar and keyboard shortcuts) ────────────
 
     def start_add_mode(self) -> None:
         if self.state.current_image is None:

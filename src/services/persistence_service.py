@@ -12,8 +12,6 @@ class PersistenceService:
     def __init__(self, repository: Repository | None = None) -> None:
         self._repo = repository or get_repository()
 
-    # -- images ----------------------------------------------------------
-
     def register_folder(self, folder: Path, files: list[Path]) -> list[ImageRecord]:
         folder_key = str(folder.resolve())
         existing = {row['absolute_path']: row for row in self._repo.list_images(folder_key)}
@@ -82,8 +80,6 @@ class PersistenceService:
     def save_detections(self, image: ImageRecord) -> None:
         payload = [det.as_dict() for det in image.detections]
         self._repo.replace_detections(image.id, payload)
-
-    # -- app state -------------------------------------------------------
 
     def set_state(self, key: str, value: str) -> None:
         self._repo.set_state(key, value)

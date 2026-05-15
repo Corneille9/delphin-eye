@@ -1,5 +1,4 @@
 {
-  "model_path": "C://src/projects/school/etude_recherche/delphin-eye/output/models/default/weights/best.pt",
   "inference_imgsz": 640,
   "inference_conf": 0.25,
   "crop_margin": 300

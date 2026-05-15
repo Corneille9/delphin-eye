@@ -63,8 +63,6 @@ class ExportService:
             'corrections_dir': str(corrections_root),
         }
 
-    # ── Path helpers ──────────────────────────────────────────────────────────
-
     @staticmethod
     def compute_triees_path(folder: Path) -> Path:
         name = folder.name
@@ -77,8 +75,6 @@ class ExportService:
         new_name = name.replace('_sauvegarde', '_corrections') if '_sauvegarde' in name else name + '_corrections'
         return folder.parent / new_name
 
-    # ── Image processing ──────────────────────────────────────────────────────
-
     @staticmethod
     def _crop_and_annotate(img: ImageRecord, dst: Path, margin: int) -> None:
         """Crop the image to the union of all bboxes + margin, then number fins."""
@@ -89,15 +85,15 @@ class ExportService:
         dets = img.detections
 
         # Union bounding box of all detections
-        left   = min(d.x1 for d in dets)
-        top    = min(d.y1 for d in dets)
-        right  = max(d.x2 for d in dets)
+        left = min(d.x1 for d in dets)
+        top = min(d.y1 for d in dets)
+        right = max(d.x2 for d in dets)
         bottom = max(d.y2 for d in dets)
 
         # Apply margin and clamp to image dimensions
-        cx1 = max(0, int(left   - margin))
-        cy1 = max(0, int(top    - margin))
-        cx2 = min(W, int(right  + margin))
+        cx1 = max(0, int(left - margin))
+        cy1 = max(0, int(top - margin))
+        cx2 = min(W, int(right + margin))
         cy2 = min(H, int(bottom + margin))
 
         cropped = pil.crop((cx1, cy1, cx2, cy2))
@@ -117,33 +113,38 @@ class ExportService:
                 bx1 = det.x1 - cx1
                 by1 = det.y1 - cy1
                 bx2 = det.x2 - cx1
-                by2 = det.y2 - cy1
-                bcx = (by1 + by2) / 2  # vertical center of bbox
 
                 label = str(num)
-                bbox_text = draw.textbbox((0, 0), label, font=font)
-                tw = bbox_text[2] - bbox_text[0]
-                th = bbox_text[3] - bbox_text[1]
+                tb = draw.textbbox((0, 0), label, font=font)
+                tw = tb[2] - tb[0]
+                th = tb[3] - tb[1]
                 pad = max(3, font_size // 6)
                 gap = max(6, font_size // 3)
 
-                # Place to the right; fall back to left if it overflows
-                tx = bx2 + gap
-                ty = bcx - th / 2
-                if tx + tw + pad > cW:
-                    tx = bx1 - gap - tw - pad * 2
+                # Background: centered above the top edge of the bbox
+                bg_w = tw + pad * 2
+                bg_h = th + pad * 2
+                bg_x1 = (bx1 + bx2) / 2 - bg_w / 2
+                bg_y1 = by1 - gap - bg_h
+                bg_x2 = bg_x1 + bg_w
+                bg_y2 = bg_y1 + bg_h
 
-                # Keep vertically inside the crop
-                ty = max(0, min(ty, cH - th - pad * 2))
+                # Clamp to crop bounds
+                if bg_x1 < 0:
+                    bg_x1, bg_x2 = 0, bg_w
+                if bg_x2 > cW:
+                    bg_x1, bg_x2 = cW - bg_w, cW
+                if bg_y1 < 0:
+                    bg_y1, bg_y2 = 0, bg_h
 
-                # Label background
                 draw.rectangle(
-                    [tx - pad, ty - pad, tx + tw + pad, ty + th + pad],
+                    [bg_x1, bg_y1, bg_x2, bg_y2],
                     fill='white',
                     outline='#222222',
                     width=1,
                 )
-                draw.text((tx, ty), label, fill='#111111', font=font)
+                # Offset by tb origin so text is truly centered inside the background
+                draw.text((bg_x1 + pad - tb[0], bg_y1 + pad - tb[1]), label, fill='#111111', font=font)
 
         cropped.save(dst, quality=92)
 
@@ -167,15 +168,13 @@ class ExportService:
         except TypeError:
             return ImageFont.load_default()
 
-    # ── YOLO label output ─────────────────────────────────────────────────────
-
     @staticmethod
     def _write_yolo_labels(img: ImageRecord, path: Path) -> None:
         lines = []
         for det in img.detections:
             cx = (det.x1 + det.x2) / 2 / img.width
             cy = (det.y1 + det.y2) / 2 / img.height
-            w  = (det.x2 - det.x1) / img.width
-            h  = (det.y2 - det.y1) / img.height
+            w = (det.x2 - det.x1) / img.width
+            h = (det.y2 - det.y1) / img.height
             lines.append(f'0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}')
         path.write_text('\n'.join(lines), encoding='utf-8')

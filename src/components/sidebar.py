@@ -21,7 +21,6 @@ class Sidebar:
         with ui.element('div').classes('app-surface').style(
             'width: 256px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;'
         ):
-            # ── Header ──────────────────────────────────────
             with ui.element('div').style(
                 'padding: 12px 14px 10px; border-bottom: 1px solid var(--color-border); flex-shrink: 0;'
             ):
@@ -42,7 +41,6 @@ class Sidebar:
                     on_change=lambda _: self.refresh(),
                 ).props('dense outlined').style('width: 100%;')
 
-            # ── List ─────────────────────────────────────────
             self.list_container = ui.scroll_area().style('flex: 1; min-height: 0;')
 
         state.subscribe(self.refresh)
