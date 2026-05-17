@@ -220,5 +220,7 @@ yolo26s.pt
 yolo26n/
 notebooks/yolo26s.pt
 notebooks/yolo26n.pt
-
+default2/
+default3/
+default4/
 config/user_settings.json

@@ -11,7 +11,7 @@ PYTHON = VENV / ("Scripts/python.exe" if sys.platform == "win32" else "bin/pytho
 
 
 def setup():
-    print("==> Création du virtualenv...")
+    print("==> Création du virtualenv... (.venv)")
     venv.create(VENV, with_pip=True)
     print("==> Installation des dépendances...")
     subprocess.check_call([PYTHON, "-m", "pip", "install", "--upgrade", "pip"])

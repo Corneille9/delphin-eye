@@ -24,9 +24,11 @@ model.train(
     # 1 epoch = le modèle voit toutes les images une fois
     epochs=80,
 
+    resume=True,
+
     # Stoppe automatiquement si aucune amélioration
-    # après 41 epochs
-    patience=41,
+    # après 20 epochs
+    patience=20,
 
     # Taille des images utilisées pendant l'entraînement
     # Plus grand = meilleure précision
