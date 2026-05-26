@@ -102,7 +102,7 @@ class StatusPanel:
             avg = mean(d.confidence for d in image.detections)
             self.confidence.text = f'Confiance moyenne : {avg:.0%}'
         else:
-            self.confidence.text = 'Confiance moyenne : —'
+            self.confidence.text = 'Confiance moyenne : -'
         if image.width and image.height:
             self.size_label.text = f'Dimensions : {image.width} × {image.height} px'
         else:

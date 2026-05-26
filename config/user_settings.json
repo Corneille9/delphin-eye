@@ -1,5 +1,0 @@
-{
-  "inference_imgsz": 640,
-  "inference_conf": 0.25,
-  "crop_margin": 300
-}

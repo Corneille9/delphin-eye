@@ -209,6 +209,7 @@ __marimo__/
 data/labels/
 data/processed/
 data/predict/
+data/backgrounds/
 # output/models/
 output/predictions/
 src/database/app.db

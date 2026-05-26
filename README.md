@@ -29,12 +29,39 @@ cd delphin-eye
 ./run.sh
 ```
 
-`run.sh` installe automatiquement les dépendances au premier lancement, puis démarre l'application. L'interface s'ouvre dans le navigateur à l'adresse indiquée dans le terminal (par défaut `http://localhost:8080`).
+`run.sh` crée automatiquement un virtualenv `.venv/`, installe toutes les dépendances au premier lancement, puis démarre l'application. Si `requirements.txt` est modifié ultérieurement, la mise à jour des dépendances se fait automatiquement au prochain lancement.
+
+L'interface s'ouvre dans le navigateur à l'adresse indiquée dans le terminal (par défaut `http://localhost:8080`).
 
 Pour les lancements suivants :
 
 ```bash
 ./run.sh
+```
+
+### Installation manuelle (sans run.sh)
+
+Si tu préfères gérer l'environnement toi-même :
+
+```bash
+# Créer et activer le virtualenv
+python3 -m venv .venv
+source .venv/bin/activate        # Linux / Mac
+# .venv\Scripts\activate         # Windows
+
+# Installer les dépendances
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Lancer l'application
+python run.py
+```
+
+Pour mettre à jour les dépendances après une modification de `requirements.txt` :
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ## Utilisation
