@@ -10,7 +10,6 @@ from services.persistence_service import PersistenceService
 ProgressCallback = Callable[[int, int, ImageRecord], None]
 DoneCallback = Callable[[int], None]
 
-
 class PredictionService:
     """Wraps Ultralytics YOLO inference with lazy loading and background run."""
 
@@ -39,41 +38,78 @@ class PredictionService:
                 raise FileNotFoundError(
                     f"Modèle YOLO introuvable : {self._settings.model_path}"
                 )
-            from ultralytics import YOLO  # lazy import
-            self._model = YOLO(str(self._settings.model_path))
+            if self._settings.inference_mode == 'sahi':
+                from sahi import AutoDetectionModel
+                self._model = AutoDetectionModel.from_pretrained(
+                    model_type="ultralytics",
+                    model_path=str(self._settings.model_path),
+                    confidence_threshold=self._settings.inference_conf,
+                    device="cpu",
+                )
+            else:
+                from ultralytics import YOLO
+                self._model = YOLO(str(self._settings.model_path))
         return self._model
 
     def predict_one(self, image: ImageRecord) -> list[Detection]:
         model = self._ensure_model()
-        results = model.predict(
-            source=str(image.absolute_path),
-            imgsz=self._settings.inference_imgsz,
-            conf=self._settings.inference_conf,
-            verbose=False,
-        )
         detections: list[Detection] = []
-        if not results:
-            return detections
-        r = results[0]
-        if r.boxes is None:
-            return detections
-        h, w = r.orig_shape if hasattr(r, 'orig_shape') else (image.height or 0, image.width or 0)
-        if image.width is None or image.height is None:
-            if w and h:
-                image.width, image.height = int(w), int(h)
-                self._persistence.update_dimensions(image)
-        xyxy = r.boxes.xyxy.cpu().numpy() if hasattr(r.boxes, 'xyxy') else []
-        confs = r.boxes.conf.cpu().numpy() if hasattr(r.boxes, 'conf') else []
-        for idx, (box, conf) in enumerate(zip(xyxy, confs), start=1):
-            x1, y1, x2, y2 = [float(v) for v in box]
-            detections.append(
-                Detection(
-                    local_id=idx,
-                    x1=x1, y1=y1, x2=x2, y2=y2,
-                    confidence=float(conf),
-                    source=DetectionSource.AUTO,
-                )
+
+        if self._settings.inference_mode == 'sahi':
+            from sahi.predict import get_sliced_prediction
+            result = get_sliced_prediction(
+                str(image.absolute_path),
+                model,
+                slice_height=self._settings.inference_imgsz,
+                slice_width=self._settings.inference_imgsz,
+                overlap_height_ratio=self._settings.inference_overlap,
+                overlap_width_ratio=self._settings.inference_overlap,
             )
+            if image.width is None or image.height is None:
+                from PIL import Image as PILImage
+                with PILImage.open(str(image.absolute_path)) as pil_img:
+                    image.width, image.height = pil_img.size
+                self._persistence.update_dimensions(image)
+            for idx, pred in enumerate(result.object_prediction_list, start=1):
+                x1, y1, x2, y2 = pred.bbox.to_xyxy()
+                detections.append(
+                    Detection(
+                        local_id=idx,
+                        x1=float(x1), y1=float(y1), x2=float(x2), y2=float(y2),
+                        confidence=float(pred.score.value),
+                        source=DetectionSource.AUTO,
+                    )
+                )
+        else:
+            results = model.predict(
+                source=str(image.absolute_path),
+                imgsz=self._settings.inference_imgsz,
+                conf=self._settings.inference_conf,
+                verbose=False,
+            )
+            if not results:
+                return detections
+            r = results[0]
+            if r.boxes is None:
+                return detections
+            h, w = r.orig_shape if hasattr(r, 'orig_shape') else (image.height or 0, image.width or 0)
+            if image.width is None or image.height is None:
+                if w and h:
+                    image.width, image.height = int(w), int(h)
+                    self._persistence.update_dimensions(image)
+            xyxy = r.boxes.xyxy.cpu().numpy() if hasattr(r.boxes, 'xyxy') else []
+            confs = r.boxes.conf.cpu().numpy() if hasattr(r.boxes, 'conf') else []
+            for idx, (box, conf) in enumerate(zip(xyxy, confs), start=1):
+                x1, y1, x2, y2 = [float(v) for v in box]
+                detections.append(
+                    Detection(
+                        local_id=idx,
+                        x1=x1, y1=y1, x2=x2, y2=y2,
+                        confidence=float(conf),
+                        source=DetectionSource.AUTO,
+                    )
+                )
+
         return detections
 
     def run_batch_async(
@@ -117,6 +153,10 @@ class PredictionService:
                     pass
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def reset_model(self) -> None:
+        with self._lock:
+            self._model = None
 
     def cancel(self) -> None:
         self._cancel.set()

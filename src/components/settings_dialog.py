@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from nicegui import ui
 
 from config import get_settings
+from config.settings import ModelEntry
 from models.app_state import AppState
 from services.export_service import ExportService
+
+_CUSTOM_ID = 'custom'
 
 
 class SettingsDialog:
@@ -12,14 +17,39 @@ class SettingsDialog:
         self._state = state
         self._settings = get_settings()
 
+        initial_id = self._current_model_id()
+
         with ui.dialog() as self.dialog, ui.card().style('min-width: 540px;'):
             ui.label('Paramètres').classes('app-title')
 
-            self._model_input = (
-                ui.input('Chemin du modèle YOLO', value=str(self._settings.model_path))
+            self._model_select = (
+                ui.select(
+                    options=self._build_model_options(),
+                    value=initial_id,
+                    label='Modèle',
+                    on_change=self._on_model_change,
+                )
                 .props('outlined dense')
                 .classes('w-full')
             )
+
+            self._model_path_input = (
+                ui.input('Chemin du modèle (.pt)', value=str(self._settings.model_path))
+                .props('outlined dense')
+                .classes('w-full')
+            )
+            self._model_path_input.set_visibility(initial_id == _CUSTOM_ID)
+
+            self._mode_select = (
+                ui.select(
+                    options={'yolo': 'YOLO · rapide', 'sahi': 'SAHI · découpé (lent, précis sur grandes images)'},
+                    value=self._settings.inference_mode,
+                    label='Mode de détection',
+                )
+                .props('outlined dense')
+                .classes('w-full')
+            )
+
             self._imgsz_input = (
                 ui.number('Taille inférence (px)', value=self._settings.inference_imgsz,
                           min=320, max=1536, step=32)
@@ -49,12 +79,50 @@ class SettingsDialog:
                 ui.button('Annuler', on_click=self.dialog.close).props('flat no-caps').classes('app-ghost')
                 ui.button('Enregistrer', on_click=self._save).props('no-caps').classes('app-primary')
 
+    def _build_model_options(self) -> dict[str, str]:
+        options: dict[str, str] = {}
+        for entry in self._settings.model_catalog:
+            label = entry.name
+            if entry.recommended:
+                label += ' ★'
+            options[entry.id] = label
+        options[_CUSTOM_ID] = 'Modèle personnalisé…'
+        return options
+
+    def _current_model_id(self) -> str:
+        current = self._settings.model_path.resolve()
+        for entry in self._settings.model_catalog:
+            if entry.path.resolve() == current:
+                return entry.id
+        return _CUSTOM_ID
+
+    def _on_model_change(self, e) -> None:
+        selected_id = e.value
+        is_custom = selected_id == _CUSTOM_ID
+        self._model_path_input.set_visibility(is_custom)
+        if not is_custom:
+            entry = self._find_entry(selected_id)
+            if entry:
+                self._imgsz_input.value = entry.imgsz
+
+    def _find_entry(self, model_id: str) -> ModelEntry | None:
+        return next((m for m in self._settings.model_catalog if m.id == model_id), None)
+
     def _save(self) -> None:
-        self._settings.model_path = __import__('pathlib').Path(str(self._model_input.value))
+        selected_id = self._model_select.value
+        if selected_id == _CUSTOM_ID:
+            self._settings.model_path = Path(str(self._model_path_input.value))
+        else:
+            entry = self._find_entry(selected_id)
+            if entry:
+                self._settings.model_path = entry.path
+
+        self._settings.inference_mode = self._mode_select.value
         self._settings.inference_imgsz = int(self._imgsz_input.value or 640)
         self._settings.inference_conf = float(self._conf_input.value or 0.25)
         self._settings.crop_margin = int(self._margin_input.value or 100)
         self._settings.save_user_overrides()
+        self._state.prediction.reset_model()
         ui.notify('Paramètres enregistrés.', type='positive')
         self.dialog.close()
 

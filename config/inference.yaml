@@ -1,0 +1,33 @@
+inference:
+  # yolo: direct inference, fast. sahi: sliced inference, better on large images.
+  mode: sahi
+  overlap: 0.2
+
+# Models ordered best → worst by mAP50 (best.pt of each run).
+# imgsz must match the resolution used during training.
+models:
+  - id: delv2-i725-e200-inf960-s
+    name: "Small v2 · 725 img · 200 ep · 960 px · mAP50 97.5%"
+    path: output/models/saved/delv2-i725-e200-inf960-s/weights/best.pt
+    imgsz: 960
+    recommended: true
+
+  - id: delv2-i725-e200-inf960-n
+    name: "Nano v2 · 725 img · 200 ep · 960 px · mAP50 97.1%"
+    path: output/models/saved/delv2-i725-e200-inf960-n/weights/best.pt
+    imgsz: 960
+
+  - id: del-i725-e100-medium
+    name: "Medium · 725 img · 100 ep · 640 px · mAP50 96.5%"
+    path: output/models/saved/del-i725-e100-medium/weights/best.pt
+    imgsz: 640
+
+  - id: del-i725-e80-small
+    name: "Small · 725 img · 80 ep · 640 px"
+    path: output/models/saved/del-i725-e80-small/weights/best.pt
+    imgsz: 640
+
+  - id: del-i427-e50-nano
+    name: "Nano · 427 img · 50 ep · 640 px · mAP50 96.2%"
+    path: output/models/saved/del-i427-e50-nano/weights/best.pt
+    imgsz: 640
