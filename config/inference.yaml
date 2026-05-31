@@ -1,6 +1,6 @@
 inference:
   # yolo: direct inference, fast. sahi: sliced inference, better on large images.
-  mode: sahi
+  mode: yolo
   overlap: 0.2
 
 # Models ordered best → worst by mAP50 (best.pt of each run).
