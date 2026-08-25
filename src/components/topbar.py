@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import os
 from typing import Callable
 
@@ -77,9 +78,11 @@ class TopBar:
         state.subscribe(self.refresh)
         self.refresh()
 
-    def _handle_folder_click(self) -> None:
+    async def _handle_folder_click(self) -> None:
         if self.state.queue.folder is None:
-            self._on_select_folder()
+            result = self._on_select_folder()
+            if inspect.isawaitable(result):
+                await result
         else:
             self._on_reset_folder()
 

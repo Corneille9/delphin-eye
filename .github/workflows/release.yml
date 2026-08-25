@@ -1,0 +1,106 @@
+name: Release
+
+# PyInstaller cannot cross-compile, so each executable is built on its own OS.
+# Pushing to main refreshes a rolling "latest" prerelease; pushing a v* tag
+# publishes a real release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or refresh the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          if [ "$TAG" = "latest" ]; then
+            # Move the rolling tag to the current commit.
+            git tag -f latest && git push -f origin latest
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --target "$GITHUB_SHA"
+          else
+            gh release create "$TAG" \
+              --title "Delphin Eye $TAG" \
+              --notes "Build automatique du commit $GITHUB_SHA." \
+              --prerelease="${{ steps.meta.outputs.prerelease }}"
+          fi
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Built on the oldest supported runner so the binary also runs on
+          # newer glibc versions.
+          - os: ubuntu-22.04
+            asset: DelphinEye-linux-x86_64.tar.gz
+          - os: windows-latest
+            asset: DelphinEye-windows-x86_64.zip
+          - os: macos-14
+            asset: DelphinEye-macos-arm64.zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # `gi` is excluded from the bundle, so nothing GTK-related is needed to
+      # build - only to run, where the package depends on python3-gi.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Build
+        run: pyinstaller packaging/delphin_eye.spec --noconfirm
+
+      - name: Archive (Linux)
+        if: runner.os == 'Linux'
+        run: tar -czf "${{ matrix.asset }}" -C dist DelphinEye
+
+      # BUNDLE produces a real .app on macOS; ditto keeps its metadata intact,
+      # which a plain zip would strip.
+      - name: Archive (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent dist/DelphinEye.app "${{ matrix.asset }}"
+
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/DelphinEye -DestinationPath "${{ matrix.asset }}"
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.prepare.outputs.tag }}" "${{ matrix.asset }}" --clobber

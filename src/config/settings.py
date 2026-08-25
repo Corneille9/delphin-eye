@@ -5,7 +5,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+from config.paths import is_frozen, resource_dir, user_data_dir
+
+PROJECT_ROOT = resource_dir()
+
+
+def _database_path() -> Path:
+    if is_frozen():
+        return user_data_dir() / 'app.db'
+    return PROJECT_ROOT / 'src' / 'database' / 'app.db'
+
+
+def _user_config_path() -> Path:
+    if is_frozen():
+        return user_data_dir() / 'user_settings.json'
+    return PROJECT_ROOT / 'config' / 'user_settings.json'
 
 
 @dataclass
@@ -21,7 +35,8 @@ class ModelEntry:
 class Settings:
     project_root: Path = PROJECT_ROOT
     model_path: Path = PROJECT_ROOT / 'output' / 'models' / 'default' / 'weights' / 'best.pt'
-    database_path: Path = PROJECT_ROOT / 'src' / 'database' / 'app.db'
+    model_id: str = ''
+    database_path: Path = field(default_factory=_database_path)
 
     supported_formats: tuple[str, ...] = ('.jpg', '.jpeg', '.png', '.webp')
     inference_imgsz: int = 640
@@ -30,13 +45,13 @@ class Settings:
     inference_mode: str = 'yolo'
     crop_margin: int = 200
 
-    user_config_path: Path = PROJECT_ROOT / 'config' / 'user_settings.json'
+    user_config_path: Path = field(default_factory=_user_config_path)
     inference_config_path: Path = PROJECT_ROOT / 'config' / 'inference.yaml'
 
     model_catalog: list[ModelEntry] = field(default_factory=list, repr=False)
 
     _overridable_fields: tuple[str, ...] = field(
-        default=('model_path', 'inference_imgsz', 'inference_conf', 'inference_overlap', 'inference_mode', 'crop_margin'),
+        default=('model_path', 'model_id', 'inference_imgsz', 'inference_conf', 'inference_overlap', 'inference_mode', 'crop_margin'),
         repr=False,
     )
 
@@ -63,9 +78,17 @@ class Settings:
             )
             for m in data.get('models', [])
         ]
+        # A fresh install should start on the recommended model, not on whatever
+        # output/models/default happens to hold.
+        recommended = next((m for m in self.model_catalog if m.recommended), None)
+        if recommended is not None:
+            self.model_path = recommended.path
+            self.model_id = recommended.id
+            self.inference_imgsz = recommended.imgsz
 
     def ensure_directories(self) -> None:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        self.user_config_path.parent.mkdir(parents=True, exist_ok=True)
 
     def model_available(self) -> bool:
         return self.model_path.exists()
@@ -88,6 +111,10 @@ class Settings:
                 setattr(self, key, Path(value))
             else:
                 setattr(self, key, type(current)(value))
+        if self.model_id:
+            entry = next((m for m in self.model_catalog if m.id == self.model_id), None)
+            if entry is not None:
+                self.model_path = entry.path
 
     def save_user_overrides(self, keys: Iterable[str] | None = None) -> None:
         keys = tuple(keys) if keys is not None else self._overridable_fields

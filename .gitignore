@@ -31,6 +31,7 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+!packaging/*.spec
 
 # Installer logs
 pip-log.txt
@@ -213,6 +214,8 @@ data/backgrounds/
 # output/models/
 output/predictions/
 src/database/app.db
+src/database/app.db-shm
+src/database/app.db-wal
 .idea/
 data.zip
 
@@ -221,7 +224,14 @@ yolo26s.pt
 yolo26n/
 notebooks/yolo26s.pt
 notebooks/yolo26n.pt
+
+config/user_settings.json
 default2/
 default3/
 default4/
-config/user_settings.json
+
+# PyInstaller output
+/build/
+/dist/
+.venv-build/
+output/cache/

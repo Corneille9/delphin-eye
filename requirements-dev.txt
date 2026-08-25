@@ -1,0 +1,13 @@
+# Development, training and packaging tooling. Not shipped to end users.
+-r requirements.txt
+
+# Notebooks and training scripts (notebooks/).
+jupyter
+ipykernel
+matplotlib
+
+# Packaging.
+pyinstaller
+
+# GPU training needs the CUDA build of PyTorch instead of the CPU pins above:
+#   pip install --force-reinstall --index-url https://download.pytorch.org/whl/cu130 torch torchvision
