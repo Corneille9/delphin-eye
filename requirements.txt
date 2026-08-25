@@ -1,8 +1,22 @@
+# Runtime dependencies of the Delphin Eye desktop app.
+# Training / notebook tooling lives in requirements-dev.txt and is never packaged.
+
+# CPU-only PyTorch: inference runs on CPU (see PredictionService), so the CUDA
+# wheels would add ~4 GB to the bundle for nothing. macOS wheels are CPU-only already.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.11.0+cpu; sys_platform != "darwin"
+torchvision==0.26.0+cpu; sys_platform != "darwin"
+torch==2.11.0; sys_platform == "darwin"
+torchvision==0.26.0; sys_platform == "darwin"
+
 ultralytics
-matplotlib
+sahi
 pillow
+
 nicegui
 pywebview
-fastapi
-uvicorn
-sahi
+# Windows (EdgeChromium/WebView2) and macOS (system WebKit) need nothing more.
+# Linux needs the GTK bindings, which pip would have to compile - install them
+# from the distribution instead, they are not listed here on purpose:
+#   sudo apt install python3-gi python3-gi-cairo gir1.2-webkit2-4.1
+# and create the venv with --system-site-packages so the app can see them.
