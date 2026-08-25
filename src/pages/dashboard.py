@@ -28,7 +28,11 @@ async def _pick_folder_webview() -> str | None:
     window = app.native.main_window
     if window is None:
         return None
-    result = await window.create_file_dialog(webview.FOLDER_DIALOG)
+    # FileDialog.FOLDER is a plain enum; the legacy webview.FOLDER_DIALOG is a
+    # proxy object that cannot cross NiceGUI's process boundary.
+    folder_dialog = getattr(webview, 'FileDialog', None)
+    dialog_type = folder_dialog.FOLDER if folder_dialog is not None else 20
+    result = await window.create_file_dialog(dialog_type)
     if not result:
         return None
     return result[0] if isinstance(result, (list, tuple)) else str(result)

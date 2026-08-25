@@ -7,6 +7,7 @@ from nicegui import events, ui
 
 from models.app_state import AppState
 from models.entities import DetectionSource, ImageRecord
+from services.preview_service import preview_scale
 
 
 class CanvasView:
@@ -29,7 +30,7 @@ class CanvasView:
                     events=['mousedown', 'mousemove', 'mouseup'],
                     sanitize=False,
                 )
-                .style('max-width: 100%; max-height: 100%;')
+                .classes('app-canvas-image')
             )
             self._draft_layer = self._img.add_layer()
 
@@ -57,6 +58,16 @@ class CanvasView:
         state.subscribe(self.refresh)
         self.refresh()
 
+    def _scale(self, image: ImageRecord | None) -> float:
+        """Original image pixels -> preview (SVG) units.
+
+        The canvas is served a downscaled copy of the photo, so the SVG viewport
+        matches the preview, while detections are stored in original coordinates.
+        """
+        if image is None:
+            return 1.0
+        return preview_scale(image.width, image.height)
+
     def _spx(self, target_screen_px: float, image: ImageRecord | None) -> float:
         """Convert a target screen-pixel size to SVG coordinate units.
 
@@ -65,20 +76,25 @@ class CanvasView:
         to derive the conversion factor; the result looks reasonable across
         typical display widths (600–1200 px).
         """
-        image_w = image.width if (image and image.width) else 1920
+        image_w = (image.width if (image and image.width) else 1920) * self._scale(image)
         return target_screen_px * image_w / 800.0
 
     def _on_mouse(self, e: events.MouseEventArguments) -> None:
+        image = self.state.current_image
+        scale = self._scale(image)
+        # Everything below works in original image coordinates, like the stored
+        # detections; only the SVG we emit is expressed in preview units.
+        mouse_x, mouse_y = e.image_x / scale, e.image_y / scale
+
         if e.type == 'mousedown':
-            image = self.state.current_image
             if image is None:
                 return
-            idx = self._hit_test(e.image_x, e.image_y, image)
+            idx = self._hit_test(mouse_x, mouse_y, image)
             if idx is not None:
                 self.state.select_detection(idx)
             else:
                 self.state.select_detection(None)
-                self._draw_start = (e.image_x, e.image_y)
+                self._draw_start = (mouse_x, mouse_y)
 
         elif e.type == 'mousemove':
             if self._draw_start:
@@ -86,10 +102,10 @@ class CanvasView:
                 if now - self._last_move < 0.04:
                     return
                 self._last_move = now
-                x1 = min(self._draw_start[0], e.image_x)
-                y1 = min(self._draw_start[1], e.image_y)
-                w = abs(e.image_x - self._draw_start[0])
-                h = abs(e.image_y - self._draw_start[1])
+                x1 = min(self._draw_start[0], mouse_x) * scale
+                y1 = min(self._draw_start[1], mouse_y) * scale
+                w = abs(mouse_x - self._draw_start[0]) * scale
+                h = abs(mouse_y - self._draw_start[1]) * scale
                 self._draft_layer.content = (
                     f'<rect x="{x1:.1f}" y="{y1:.1f}" width="{w:.1f}" height="{h:.1f}" '
                     f'fill="rgba(245,158,11,0.08)" stroke="#F59E0B" '
@@ -100,10 +116,10 @@ class CanvasView:
 
         elif e.type == 'mouseup':
             if self._draw_start:
-                x1 = min(self._draw_start[0], e.image_x)
-                y1 = min(self._draw_start[1], e.image_y)
-                x2 = max(self._draw_start[0], e.image_x)
-                y2 = max(self._draw_start[1], e.image_y)
+                x1 = min(self._draw_start[0], mouse_x)
+                y1 = min(self._draw_start[1], mouse_y)
+                x2 = max(self._draw_start[0], mouse_x)
+                y2 = max(self._draw_start[1], mouse_y)
                 self._draw_start = None
                 self._draft_layer.content = ''
                 if x2 - x1 > 5 and y2 - y1 > 5:
@@ -144,10 +160,9 @@ class CanvasView:
             self._draw_start = None
             self._draft_layer.content = ''
 
-            style = 'max-width: 100%; max-height: 100%;'
-            if image.width and image.height:
-                style += f' aspect-ratio: {image.width} / {image.height};'
-            self._img.style(style)
+            # No aspect-ratio here on purpose: the image sizes itself (see the
+            # .app-canvas-image rule) and the wrapper shrink-wraps around it, so
+            # the SVG overlay always lines up with what is actually painted.
 
         self._img.content = self._build_svg(image)
 
@@ -158,6 +173,7 @@ class CanvasView:
         # Box borders use vector-effect="non-scaling-stroke" so stroke-width
         # is always in screen pixels regardless of the image's natural size.
         # Label/text dimensions use _spx() to convert screen px → SVG units.
+        scale = self._scale(image)
         px = lambda n: self._spx(n, image)
         fs = px(12)  # font-size  → 12 screen px
         lh = px(20)  # label height → 20 screen px
@@ -181,7 +197,8 @@ class CanvasView:
             lbl = f'#{det.local_id} {conf}%'
             lw = len(lbl) * fs * 0.63 + pad * 2
 
-            x1, y1, x2, y2 = det.x1, det.y1, det.x2, det.y2
+            x1, y1 = det.x1 * scale, det.y1 * scale
+            x2, y2 = det.x2 * scale, det.y2 * scale
             w, h = x2 - x1, y2 - y1
             ly = max(0.0, y1 - lh - px(2))
 

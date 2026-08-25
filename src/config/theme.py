@@ -177,6 +177,26 @@ body {
 """
 
 
+CANVAS_IMAGE_CSS = """
+/* ui.interactive_image hardcodes width/height: 100% on its <img>, which gives
+   the wrapper no intrinsic size to resolve its aspect-ratio box against. Chrome
+   falls back to the image's natural size, WebKit resolves it to zero and the
+   photo never shows up. Letting the image size itself works in both. */
+.app-canvas-image {
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: auto !important;
+}
+.app-canvas-image > img {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+"""
+
+
 def apply_theme(theme: Theme = THEME) -> None:
     css = GLOBAL_CSS.replace('__VARS__', theme.as_css_vars())
-    ui.add_head_html(f'<style>{css}</style>')
+    ui.add_head_html(f'<style>{css}{CANVAS_IMAGE_CSS}</style>')

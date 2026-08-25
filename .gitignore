@@ -230,3 +230,4 @@ config/user_settings.json
 /build/
 /dist/
 .venv-build/
+output/cache/

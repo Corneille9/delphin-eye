@@ -44,6 +44,13 @@ def assets_dir() -> Path:
     return resource_dir() / 'src' / 'assets'
 
 
+def cache_dir() -> Path:
+    """Regenerable files (canvas previews). Safe to delete at any time."""
+    if is_frozen():
+        return user_data_dir() / 'cache'
+    return resource_dir() / 'output' / 'cache'
+
+
 def native_enabled() -> bool:
     """Native webview window. On by default everywhere, dev included, so what we
     test locally is what the packaged app does.
