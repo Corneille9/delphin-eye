@@ -25,7 +25,9 @@ def install():
 
 def setup():
     print("Creating virtual environment...")
-    venv.create(VENV, with_pip=True)
+    # system_site_packages: the native webview needs PyGObject on Linux, which
+    # pip cannot build - it comes from the distribution (python3-gi).
+    venv.create(VENV, with_pip=True, system_site_packages=True)
     print("Installing dependencies...")
     install()
 

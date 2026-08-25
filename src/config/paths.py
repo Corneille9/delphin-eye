@@ -45,11 +45,12 @@ def assets_dir() -> Path:
 
 
 def native_enabled() -> bool:
-    """Native window by default in the packaged app, browser in development.
+    """Native webview window. On by default everywhere, dev included, so what we
+    test locally is what the packaged app does.
 
-    ``DELPHIN_NATIVE=1`` forces native mode locally, ``DELPHIN_NATIVE=0`` disables it.
+    Set ``DELPHIN_NATIVE=0`` to fall back to serving the UI in a browser.
     """
     override = os.environ.get('DELPHIN_NATIVE')
     if override is not None:
         return override.strip().lower() not in ('', '0', 'false', 'no')
-    return is_frozen()
+    return True

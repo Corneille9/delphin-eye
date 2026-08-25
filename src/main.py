@@ -52,11 +52,15 @@ def main() -> None:
     native = native_enabled()
     ui.run(
         title='Delphin Eye',
-        reload=False,
         favicon=str(assets / 'favicon.ico'),
         native=native,
         window_size=WINDOW_SIZE if native else None,
-        show=not native,
+        # Desktop app, not a server: no auto-reload, no browser tab, loopback
+        # only so the UI is never exposed on the local network, and quiet logs.
+        reload=False,
+        show=False,
+        host='127.0.0.1',
+        uvicorn_logging_level='warning',
     )
 
 
