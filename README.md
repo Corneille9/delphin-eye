@@ -19,7 +19,12 @@ Delphin Eye automatise la première étape : détecter et localiser les nageoire
 ## Prérequis
 
 - Python 3.10 ou supérieur
-- Un modèle YOLO entraîné (`output/models/default/weights/best.pt` par défaut)
+- Un modèle YOLO entraîné (le modèle recommandé de `config/inference.yaml` est utilisé par défaut)
+- **Sur Linux uniquement**, les bibliothèques de la fenêtre native :
+  ```bash
+  sudo apt install python3-gi python3-gi-cairo gir1.2-webkit2-4.1
+  ```
+  Windows (WebView2) et macOS (WebKit) n'ont rien à installer.
 
 ## Installation et démarrage
 
@@ -31,7 +36,7 @@ cd delphin-eye
 
 `run.sh` crée automatiquement un virtualenv `.venv/`, installe toutes les dépendances au premier lancement, puis démarre l'application. Si `requirements.txt` est modifié ultérieurement, la mise à jour des dépendances se fait automatiquement au prochain lancement.
 
-L'interface s'ouvre dans le navigateur à l'adresse indiquée dans le terminal (par défaut `http://localhost:8080`).
+L'interface s'ouvre dans une fenêtre native. Si les bibliothèques système manquent, l'application le signale et bascule sur le navigateur. Pour forcer ce mode : `DELPHIN_NATIVE=0 ./run.sh`.
 
 Pour les lancements suivants :
 
@@ -51,7 +56,8 @@ source .venv/bin/activate        # Linux / Mac
 
 # Installer les dépendances
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements.txt        # dépendances de l'application
+# pip install -r requirements-dev.txt  # + notebooks, entraînement, packaging
 
 # Lancer l'application
 python run.py
@@ -92,3 +98,18 @@ Si le dossier source contient `_sauvegarde` dans son nom, le suffixe est remplac
 ## Configuration
 
 Les paramètres (chemin du modèle, seuil de confiance, marge de recadrage) sont accessibles via l'icône ⚙️ dans la barre du haut et sauvegardés dans `config/user_settings.json`.
+
+## Build
+
+`requirements.txt` ne contient que ce dont l'application a besoin (PyTorch CPU, pas de CUDA). Les notebooks, l'entraînement et PyInstaller vivent dans `requirements-dev.txt` et ne sont jamais empaquetés.
+
+```bash
+pip install -r requirements-dev.txt
+pyinstaller packaging/delphin_eye.spec --noconfirm
+```
+
+Le résultat arrive dans `dist/DelphinEye/` (mode `onedir` : un `onefile` de cette taille se décompresse à chaque lancement). Le bundle embarque les assets, `config/inference.yaml` et les poids `best.pt` du catalogue ; les checkpoints `last.pt`, le dataset et les notebooks sont exclus.
+
+**PyInstaller ne fait pas de compilation croisée** : chaque exécutable doit être produit sur son OS. C'est le rôle du workflow `.github/workflows/release.yml`, qui construit les trois plateformes et publie les archives sur la page Releases.
+
+Dans l'application empaquetée, les fichiers modifiables (base SQLite, préférences, cache des aperçus) vont dans le dossier utilisateur — `%APPDATA%\DelphinEye`, `~/Library/Application Support/DelphinEye` ou `~/.local/share/DelphinEye` — et non dans le dossier d'installation.

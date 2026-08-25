@@ -54,6 +54,10 @@ excludes = [
     'notebook', 'nbconvert', 'nbformat', 'jedi', 'debugpy', 'pytest',
     # The window comes from the system webview; no extra GUI toolkit is bundled.
     'tkinter', 'PyQt5', 'PyQt6', 'PySide2', 'PySide6',
+    # PyGObject cannot be frozen reliably: its PyInstaller hook drags in the
+    # whole GI stack and WebKit spawns helper processes with absolute paths.
+    # On Linux the package depends on python3-gi instead - see main.py.
+    'gi', 'cairo',
 ]
 
 a = Analysis(
