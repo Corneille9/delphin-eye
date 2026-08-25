@@ -90,6 +90,8 @@ class SettingsDialog:
         return options
 
     def _current_model_id(self) -> str:
+        if self._settings.model_id:
+            return self._settings.model_id
         current = self._settings.model_path.resolve()
         for entry in self._settings.model_catalog:
             if entry.path.resolve() == current:
@@ -112,10 +114,12 @@ class SettingsDialog:
         selected_id = self._model_select.value
         if selected_id == _CUSTOM_ID:
             self._settings.model_path = Path(str(self._model_path_input.value))
+            self._settings.model_id = ''
         else:
             entry = self._find_entry(selected_id)
             if entry:
                 self._settings.model_path = entry.path
+                self._settings.model_id = entry.id
 
         self._settings.inference_mode = self._mode_select.value
         self._settings.inference_imgsz = int(self._imgsz_input.value or 640)

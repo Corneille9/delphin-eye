@@ -12,7 +12,7 @@ from components import (
     StatusPanel,
     TopBar,
 )
-from config import apply_theme, get_settings
+from config import apply_theme, get_settings, native_enabled
 from models.app_state import AppState
 from services.export_service import ExportService
 from services.image_queue_service import ImageQueueService
@@ -20,7 +20,21 @@ from services.persistence_service import PersistenceService
 from services.prediction_service import PredictionService
 
 
-def _pick_folder_native() -> str | None:
+async def _pick_folder_webview() -> str | None:
+    """Folder picker of the embedded webview - no external tool required."""
+    import webview
+    from nicegui import app
+
+    window = app.native.main_window
+    if window is None:
+        return None
+    result = await window.create_file_dialog(webview.FOLDER_DIALOG)
+    if not result:
+        return None
+    return result[0] if isinstance(result, (list, tuple)) else str(result)
+
+
+def _pick_folder_system() -> str | None:
     import platform
     import subprocess
 
@@ -100,8 +114,13 @@ def register_dashboard_page(image_url_builder) -> None:
             except Exception as exc:
                 ui.notify(f'Erreur : {exc}', type='negative')
 
-        def on_select_folder() -> None:
-            folder = _pick_folder_native()
+        async def on_select_folder() -> None:
+            if native_enabled():
+                folder = await _pick_folder_webview()
+                if folder:
+                    _load_folder(Path(folder))
+                return
+            folder = _pick_folder_system()
             if folder:
                 _load_folder(Path(folder))
             else:
