@@ -78,6 +78,13 @@ class Settings:
             )
             for m in data.get('models', [])
         ]
+        # A fresh install should start on the recommended model, not on whatever
+        # output/models/default happens to hold.
+        recommended = next((m for m in self.model_catalog if m.recommended), None)
+        if recommended is not None:
+            self.model_path = recommended.path
+            self.model_id = recommended.id
+            self.inference_imgsz = recommended.imgsz
 
     def ensure_directories(self) -> None:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
