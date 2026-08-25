@@ -213,6 +213,8 @@ data/backgrounds/
 # output/models/
 output/predictions/
 src/database/app.db
+src/database/app.db-shm
+src/database/app.db-wal
 .idea/
 data.zip
 
