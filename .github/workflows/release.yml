@@ -97,7 +97,11 @@ jobs:
         run: |
           TAG="${{ needs.prepare.outputs.tag }}"
           if [ "$TAG" = "latest" ]; then
-            VERSION="0.0.0+$(git rev-parse --short HEAD)"
+            # Commit date first: a bare short sha does not sort chronologically
+            # (dpkg reads it as text), so apt would refuse a newer build as a
+            # downgrade. The date makes every rolling build an upgrade.
+            STAMP="$(git show -s --format=%cd --date=format:%Y%m%d%H%M HEAD)"
+            VERSION="0.0.0+${STAMP}.$(git rev-parse --short HEAD)"
           else
             VERSION="${TAG#v}"
           fi

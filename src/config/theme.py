@@ -100,10 +100,11 @@ body {
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
-.app-badge-pending   { background: #FEF3C7; color: #92400E; }
-.app-badge-validated { background: #DCFCE7; color: #166534; }
-.app-badge-rejected  { background: #FEE2E2; color: #991B1B; }
-.app-badge-manual    { background: #DBEAFE; color: #1E40AF; }
+.app-badge-pending  { background: #F1F5F9; color: #475569; }
+.app-badge-empty    { background: #FEF3C7; color: #92400E; }
+.app-badge-detected { background: #DCFCE7; color: #166534; }
+.app-badge-manual   { background: #DBEAFE; color: #1E40AF; }
+.app-badge-failed   { background: #FEE2E2; color: #991B1B; }
 
 .status-dot {
     display: inline-block;
@@ -112,14 +113,23 @@ body {
     border-radius: 50%;
     flex-shrink: 0;
 }
-.status-dot-none        { background: #CBD5E1; }
-.status-dot-detected    { background: #22C55E; }
-.status-dot-manual_edit { background: #3B82F6; }
-/* legacy names kept for any remaining references */
-.status-dot-pending     { background: #CBD5E1; }
-.status-dot-processed   { background: #22C55E; }
-.status-dot-validated   { background: #22C55E; }
-.status-dot-rejected    { background: #EF4444; }
+/* Every status gets its own colour: an analysed image with no fin has to be
+   distinguishable from one that was never analysed. */
+.status-dot-pending  { background: #CBD5E1; }
+.status-dot-empty    { background: #F59E0B; }
+.status-dot-detected { background: #22C55E; }
+.status-dot-modified { background: #3B82F6; }
+.status-dot-failed   { background: #EF4444; }
+
+.app-queue-count {
+    flex-shrink: 0;
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: #166534;
+    background: #DCFCE7;
+    border-radius: 999px;
+    padding: 1px 6px;
+}
 
 .app-queue-item {
     cursor: pointer;

@@ -6,12 +6,18 @@ from pathlib import Path
 
 
 class ImageStatus(str, Enum):
-    PENDING = 'pending'  # not yet run through the model
-    DETECTED = 'detected'  # model found at least one fin
-    MODIFIED = 'modified'  # user added or removed bboxes manually
+    PENDING = 'pending'  # never run through the model
+    EMPTY = 'empty'  # analysed, model found nothing
+    DETECTED = 'detected'  # analysed, model found at least one fin
+    MODIFIED = 'modified'  # user added, moved or removed boxes
+    FAILED = 'failed'  # analysis raised; the image was not analysed
 
 
-# Graceful migration: old status values stored in the DB before the refactor.
+#: Statuses that count as "the model has seen this image".
+ANALYSED_STATUSES = (ImageStatus.EMPTY, ImageStatus.DETECTED, ImageStatus.MODIFIED)
+
+
+# Graceful migration: status values stored by earlier versions.
 STATUS_COMPAT: dict[str, ImageStatus] = {
     'validated': ImageStatus.DETECTED,
     'rejected': ImageStatus.PENDING,
@@ -27,27 +33,47 @@ def parse_status(value: str) -> ImageStatus:
         return STATUS_COMPAT.get(value, ImageStatus.PENDING)
 
 
+def resolve_status(status: ImageStatus, detection_count: int) -> ImageStatus:
+    """Reconcile a stored status with the boxes actually present.
+
+    Builds before the status rework marked every analysed image DETECTED, even
+    the ones the model found nothing on - and a bundling bug made that every
+    image. Reading the two together repairs those rows on load.
+    """
+    if status in (ImageStatus.PENDING, ImageStatus.FAILED):
+        return status
+    if status == ImageStatus.MODIFIED:
+        return status
+    return ImageStatus.DETECTED if detection_count else ImageStatus.EMPTY
+
+
 class DetectionSource(str, Enum):
     AUTO = 'auto'
     MANUAL = 'manual'
 
 
-STATUS_ICON: dict[ImageStatus, str] = {
-    ImageStatus.PENDING: '·',
-    ImageStatus.DETECTED: '✓',
-    ImageStatus.MODIFIED: 'M',
-}
-
 STATUS_LABEL_FR: dict[ImageStatus, str] = {
     ImageStatus.PENDING: 'En attente',
-    ImageStatus.DETECTED: 'Analysée',
+    ImageStatus.EMPTY: 'Aucun aileron',
+    ImageStatus.DETECTED: 'Aileron détecté',
     ImageStatus.MODIFIED: 'Modifiée',
+    ImageStatus.FAILED: "Échec de l'analyse",
 }
 
 STATUS_BADGE_CLASS: dict[ImageStatus, str] = {
     ImageStatus.PENDING: 'app-badge app-badge-pending',
-    ImageStatus.DETECTED: 'app-badge app-badge-validated',
+    ImageStatus.EMPTY: 'app-badge app-badge-empty',
+    ImageStatus.DETECTED: 'app-badge app-badge-detected',
     ImageStatus.MODIFIED: 'app-badge app-badge-manual',
+    ImageStatus.FAILED: 'app-badge app-badge-failed',
+}
+
+STATUS_DOT_CLASS: dict[ImageStatus, str] = {
+    ImageStatus.PENDING: 'status-dot status-dot-pending',
+    ImageStatus.EMPTY: 'status-dot status-dot-empty',
+    ImageStatus.DETECTED: 'status-dot status-dot-detected',
+    ImageStatus.MODIFIED: 'status-dot status-dot-modified',
+    ImageStatus.FAILED: 'status-dot status-dot-failed',
 }
 
 

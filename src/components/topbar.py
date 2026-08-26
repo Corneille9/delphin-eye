@@ -88,9 +88,9 @@ class TopBar:
 
     def refresh(self) -> None:
         done, total = self.state.detection_progress
-        if total <= 0:
-            total = max(self.state.total, 1)
-            done = sum(1 for i in self.state.images if i.status.value != 'pending')
+        if not self.state.prediction.running:
+            # Between runs the bar shows how far the folder as a whole has got.
+            done, total = self.state.analysed_count, self.state.total
         self.progress.value = done / total if total else 0.0
         self.progress_label.text = f'{done} / {total}'
 

@@ -1,14 +1,31 @@
 from __future__ import annotations
 
+import logging
 import threading
+from dataclasses import dataclass
 from typing import Callable
 
 from config import get_settings
 from models.entities import Detection, DetectionSource, ImageRecord, ImageStatus
 from services.persistence_service import PersistenceService
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class BatchResult:
+    """Outcome of a detection run, as reported to the UI."""
+
+    analysed: int = 0
+    detections: int = 0
+    failed: int = 0
+    cancelled: bool = False
+    error: str = ''
+
+
 ProgressCallback = Callable[[int, int, ImageRecord], None]
-DoneCallback = Callable[[int], None]
+DoneCallback = Callable[[BatchResult], None]
+
 
 class PredictionService:
     """Wraps Ultralytics YOLO inference with lazy loading and background run."""
@@ -114,45 +131,77 @@ class PredictionService:
 
     def run_batch_async(
         self,
-        images: list[ImageRecord],
+        targets: list[ImageRecord],
         on_progress: ProgressCallback,
         on_done: DoneCallback,
-        only_pending: bool = True,
     ) -> None:
+        """Analyse `targets` in a background thread. Never raises to the caller."""
         if self._running:
             return
         self._cancel.clear()
         self._running = True
 
         def worker() -> None:
-            processed = 0
-            targets = [img for img in images if not only_pending or img.status in (ImageStatus.PENDING, ImageStatus.DETECTED)]
+            result = BatchResult()
             total = len(targets)
             try:
-                for img in targets:
+                # Load once up front: a broken model would otherwise fail on
+                # every image in turn and report a whole run of failures
+                # instead of the single reason behind them.
+                self._ensure_model()
+            except Exception as exc:
+                result.error = self._describe(exc)
+                logger.exception('Model could not be loaded')
+                self._finish(result, on_done)
+                return
+
+            try:
+                for done, img in enumerate(targets, start=1):
                     if self._cancel.is_set():
+                        result.cancelled = True
                         break
                     try:
-                        dets = self.predict_one(img)
-                    except Exception:
-                        dets = []
-                    img.detections = dets
-                    img.status = ImageStatus.DETECTED
+                        detections = self.predict_one(img)
+                    except Exception as exc:
+                        # The image keeps a status of its own: silently leaving
+                        # it "analysed with no fin" is what made a whole broken
+                        # run look like a successful one.
+                        img.detections = []
+                        img.status = ImageStatus.FAILED
+                        result.failed += 1
+                        if not result.error:
+                            result.error = self._describe(exc)
+                        logger.exception('Detection failed on %s', img.filename)
+                    else:
+                        img.detections = detections
+                        img.status = (
+                            ImageStatus.DETECTED if detections else ImageStatus.EMPTY
+                        )
+                        result.analysed += 1
+                        result.detections += len(detections)
+
                     self._persistence.save_detections(img)
                     self._persistence.update_status(img)
-                    processed += 1
                     try:
-                        on_progress(processed, total, img)
+                        on_progress(done, total, img)
                     except Exception:
-                        pass
+                        logger.exception('Progress callback failed')
             finally:
-                self._running = False
-                try:
-                    on_done(processed)
-                except Exception:
-                    pass
+                self._finish(result, on_done)
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _finish(self, result: BatchResult, on_done: DoneCallback) -> None:
+        self._running = False
+        try:
+            on_done(result)
+        except Exception:
+            logger.exception('Completion callback failed')
+
+    @staticmethod
+    def _describe(exc: Exception) -> str:
+        message = str(exc).strip() or exc.__class__.__name__
+        return f'{type(exc).__name__} : {message}'
 
     def reset_model(self) -> None:
         with self._lock:
