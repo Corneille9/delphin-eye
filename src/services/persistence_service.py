@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from database import Repository, get_repository
-from models.entities import Detection, DetectionSource, ImageRecord, ImageStatus, parse_status
+from models.entities import (
+    Detection, DetectionSource, ImageRecord, ImageStatus, parse_status, resolve_status,
+)
 
 
 class PersistenceService:
@@ -54,7 +56,7 @@ class PersistenceService:
                     absolute_path=Path(row['absolute_path']),
                     folder=row['folder'],
                     order_index=row['order_index'],
-                    status=parse_status(row['status']),
+                    status=resolve_status(parse_status(row['status']), len(detections)),
                     notes=row['notes'] or '',
                     width=row['width'],
                     height=row['height'],

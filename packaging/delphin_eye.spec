@@ -77,6 +77,11 @@ a = Analysis(
     optimize=0,
 )
 
+# A PyInstaller-mangled name (libfoo.a1b2c3d4.so.1, libfoo-a1b2c3d4.so.1)
+# carries a content hash, so it cannot collide with a system library.
+HASHED_LIB = re.compile(r'[.-][0-9a-f]{8}\.(so|\d)')
+
+
 # The app deliberately drives the system GTK/WebKit stack through the
 # distribution's PyGObject. Shipping our own GLib makes the system libgobject
 # resolve its symbols against the bundled (older) copy, which fails at startup
@@ -119,10 +124,6 @@ KNOWN_UNHASHED_LIBS = frozenset({
     'libz.so.1',
 })
 
-# A PyInstaller-mangled name (libfoo.a1b2c3d4.so.1, libfoo-a1b2c3d4.so.1)
-# carries a content hash, so it cannot collide with a system library.
-HASHED_LIB = re.compile(r'[.-][0-9a-f]{8}\.(so|\d)')
-
 
 def _unexpected_unhashed(binaries):
     """Unhashed libraries landing at the root of _internal.
@@ -142,11 +143,22 @@ def _unexpected_unhashed(binaries):
     return sorted(seen - KNOWN_UNHASHED_LIBS)
 
 
+def _shadows_system_lib(dest):
+    """True when the entry would hide a system library of the same name.
+
+    Only an unhashed name can: PyInstaller mangles a colliding library into
+    libfoo-1a2b3c4d.so, a SONAME nothing on the system answers to. Stripping a
+    mangled copy instead breaks the bundled library that asks for it by that
+    exact name - Pillow loses libXau and then fails to import at all.
+    """
+    name = os.path.basename(dest)
+    if HASHED_LIB.search(name):
+        return False
+    return name.startswith(SYSTEM_ONLY_LIBS)
+
+
 if sys.platform == 'linux':
-    a.binaries = [
-        entry for entry in a.binaries
-        if not os.path.basename(entry[0]).startswith(SYSTEM_ONLY_LIBS)
-    ]
+    a.binaries = [entry for entry in a.binaries if not _shadows_system_lib(entry[0])]
 
     unexpected = [
         name for name in _unexpected_unhashed(a.binaries)

@@ -5,7 +5,9 @@ from statistics import mean
 from nicegui import ui
 
 from models.app_state import AppState
-from models.entities import ImageStatus, STATUS_BADGE_CLASS, STATUS_LABEL_FR
+from models.entities import (
+    STATUS_BADGE_CLASS, STATUS_DOT_CLASS, STATUS_LABEL_FR, ImageStatus,
+)
 
 
 class StatusPanel:
@@ -65,12 +67,22 @@ class StatusPanel:
         state.subscribe(self.refresh)
         self.refresh()
 
-    def _count_row(self, label: str, value: int, dot_cls: str) -> None:
+    def _status_row(self, status: ImageStatus, label: str, value: int) -> None:
         with ui.row().classes('items-center gap-2 no-wrap'):
-            ui.html(f'<span class="status-dot {dot_cls}"></span>')
+            ui.html(f'<span class="{STATUS_DOT_CLASS[status]}"></span>')
             ui.label(label).classes('app-muted').style('flex: 1;')
             ui.label(str(value)).style(
                 'font-size: 0.79rem; font-weight: 600; color: var(--color-text);'
+            )
+
+    def _total_row(self, label: str, value: str, accent: bool = False) -> None:
+        colour = 'var(--color-primary)' if accent else 'var(--color-text)'
+        with ui.row().classes('items-center gap-2 no-wrap'):
+            ui.label(label).style(
+                'flex: 1; font-size: 0.79rem; font-weight: 600; color: var(--color-text);'
+            )
+            ui.label(value).style(
+                f'font-size: 0.79rem; font-weight: 700; color: {colour};'
             )
 
     def refresh(self) -> None:
@@ -97,7 +109,14 @@ class StatusPanel:
         )
 
         n = len(image.detections)
-        self.fin_count.text = f'{n} aileron{"s" if n > 1 else ""} détecté{"s" if n > 1 else ""}'
+        if image.status == ImageStatus.PENDING:
+            self.fin_count.text = 'Pas encore analysée'
+        elif image.status == ImageStatus.FAILED:
+            self.fin_count.text = "L'analyse a échoué"
+        elif n:
+            self.fin_count.text = f'{n} aileron{"s" if n > 1 else ""} détecté{"s" if n > 1 else ""}'
+        else:
+            self.fin_count.text = 'Aucun aileron détecté'
         if image.detections:
             avg = mean(d.confidence for d in image.detections)
             self.confidence.text = f'Confiance moyenne : {avg:.0%}'
@@ -109,21 +128,26 @@ class StatusPanel:
             self.size_label.text = 'Dimensions : inconnues'
 
         counts = self.state.counts()
+        total = self.state.total
+        analysed = self.state.analysed_count
         to_export = sum(1 for img in self.state.images if img.will_export)
 
         self.counts_container.clear()
         with self.counts_container:
-            self._count_row('En attente', counts.get(ImageStatus.PENDING, 0), 'status-dot-none')
-            self._count_row('Détectées', counts.get(ImageStatus.DETECTED, 0), 'status-dot-detected')
-            self._count_row('Modifiées', counts.get(ImageStatus.MODIFIED, 0), 'status-dot-manual_edit')
+            self._status_row(ImageStatus.PENDING, 'En attente', counts[ImageStatus.PENDING])
+            self._status_row(ImageStatus.DETECTED, 'Avec ailerons', counts[ImageStatus.DETECTED])
+            self._status_row(ImageStatus.EMPTY, 'Sans aileron', counts[ImageStatus.EMPTY])
+            self._status_row(ImageStatus.MODIFIED, 'Modifiées', counts[ImageStatus.MODIFIED])
+            if counts[ImageStatus.FAILED]:
+                self._status_row(ImageStatus.FAILED, 'En échec', counts[ImageStatus.FAILED])
+
             ui.separator().style('margin: 4px 0;')
-            with ui.row().classes('items-center gap-2 no-wrap'):
-                ui.label('À exporter').style(
-                    'flex: 1; font-size: 0.79rem; font-weight: 600; color: var(--color-text);'
-                )
-                ui.label(str(to_export)).style(
-                    'font-size: 0.79rem; font-weight: 700; color: var(--color-primary);'
-                )
+
+            # Images analysed and fins found are different quantities: one image
+            # can hold several fins, or none at all.
+            self._total_row('Images analysées', f'{analysed} / {total}')
+            self._total_row('Ailerons détectés', str(self.state.detection_count))
+            self._total_row('À exporter', str(to_export), accent=True)
 
         if self.notes.value != image.notes:
             self.notes.value = image.notes

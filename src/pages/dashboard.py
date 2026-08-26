@@ -17,7 +17,7 @@ from models.app_state import AppState
 from services.export_service import ExportService
 from services.image_queue_service import ImageQueueService
 from services.persistence_service import PersistenceService
-from services.prediction_service import PredictionService
+from services.prediction_service import BatchResult, PredictionService
 
 
 async def _pick_folder_webview() -> str | None:
@@ -138,23 +138,63 @@ def register_dashboard_page(image_url_builder) -> None:
             if state.total == 0:
                 ui.notify("Chargez d'abord un dossier.", type='warning')
                 return
+            if state.prediction.running:
+                ui.notify('Détection déjà en cours.', type='info')
+                return
             if not state.prediction.model_available():
                 ui.notify(f'Modèle YOLO introuvable : {settings.model_path}', type='negative')
                 return
-            if state.prediction.running:
-                ui.notify('Détection déjà en cours.', type='info')
+
+            # Nothing left to analyse means the user is asking for a re-run.
+            force_all = not state.detection_targets()
+            if force_all and not state.detection_targets(force_all=True):
+                ui.notify(
+                    'Toutes les images ont été modifiées à la main : rien à réanalyser.',
+                    type='info',
+                )
                 return
 
             def on_update() -> None:
                 state.notify()
 
-            def on_finished(processed: int) -> None:
+            def on_finished(result: BatchResult) -> None:
                 state.notify()
                 with _client:
-                    ui.notify(f'Détection terminée : {processed} images traitées.', type='positive')
+                    _report_detection(result)
 
-            ui.notify('Détection démarrée en arrière-plan…', type='info')
-            state.run_detection(on_update, on_finished)
+            count = state.run_detection(on_update, on_finished, force_all=force_all)
+            verb = 'Réanalyse' if force_all else 'Analyse'
+            ui.notify(f'{verb} de {count} image(s) en cours…', type='info')
+
+        def _report_detection(result: BatchResult) -> None:
+            """Say what actually happened - including when nothing worked."""
+            if result.error and not result.analysed:
+                ui.notify(
+                    f'La détection a échoué : {result.error}',
+                    type='negative',
+                    multi_line=True,
+                    timeout=0,
+                    close_button='Fermer',
+                )
+                return
+
+            fins = result.detections
+            summary = (
+                f'{result.analysed} image(s) analysée(s), '
+                f'{fins} aileron{"s" if fins > 1 else ""} détecté{"s" if fins > 1 else ""}.'
+            )
+            if result.cancelled:
+                summary = f'Détection interrompue — {summary}'
+            if result.failed:
+                ui.notify(
+                    f'{summary} {result.failed} échec(s) — {result.error}',
+                    type='warning',
+                    multi_line=True,
+                    timeout=0,
+                    close_button='Fermer',
+                )
+                return
+            ui.notify(summary, type='positive')
 
         def on_export() -> None:
             if state.export_running or state.prediction.running:
@@ -217,7 +257,10 @@ def register_dashboard_page(image_url_builder) -> None:
                 state.next_image()
             elif event.key.delete:
                 canvas.delete_selected()
-            elif getattr(event.key, 'name', '') == 'a' or event.key == 'a':
+            elif str(getattr(event.key, 'name', '')).lower() == 'a':
                 canvas.start_add_mode()
 
-        ui.keyboard(on_key=on_key)
+        # 'button' is left out of the default ignore list on purpose: clicking a
+        # toolbar arrow leaves the focus on it, and the shortcuts would then stay
+        # dead until the user clicked somewhere else.
+        ui.keyboard(on_key=on_key, ignore=['input', 'select', 'textarea'])

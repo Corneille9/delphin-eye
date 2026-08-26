@@ -3,11 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from models.entities import Detection, DetectionSource, ImageRecord, ImageStatus
+from models.entities import (
+    ANALYSED_STATUSES, Detection, DetectionSource, ImageRecord, ImageStatus,
+)
 from services.export_service import ExportService
 from services.image_queue_service import ImageQueueService
 from services.persistence_service import PersistenceService
-from services.prediction_service import PredictionService
+from services.prediction_service import BatchResult, PredictionService
 
 Listener = Callable[[], None]
 
@@ -34,6 +36,7 @@ class AppState:
         self.selected_detection_index: int | None = None
         self.detection_progress: tuple[int, int] = (0, 0)
         self.export_running: bool = False
+        self.queue_filter: str = 'all'
         self._listeners: list[Listener] = []
 
 
@@ -67,6 +70,59 @@ class AppState:
         for img in self.queue.images:
             result[img.status] = result.get(img.status, 0) + 1
         return result
+
+    @property
+    def analysed_count(self) -> int:
+        return sum(1 for img in self.queue.images if img.status in ANALYSED_STATUSES)
+
+    @property
+    def detection_count(self) -> int:
+        """Fins found, not images - the two numbers answer different questions."""
+        return sum(len(img.detections) for img in self.queue.images)
+
+    def matches_filter(self, image: ImageRecord) -> bool:
+        if self.queue_filter == 'all':
+            return True
+        if self.queue_filter == 'analysed':
+            return image.status in ANALYSED_STATUSES
+        return image.status.value == self.queue_filter
+
+    def visible_indexes(self) -> list[int]:
+        """Queue positions the sidebar is showing, in order."""
+        return [
+            index for index, img in enumerate(self.queue.images)
+            if self.matches_filter(img)
+        ]
+
+    def set_queue_filter(self, value: str) -> None:
+        if value == self.queue_filter:
+            return
+        self.queue_filter = value
+        # Keep the current image on screen when it survives the new filter, so
+        # the arrows carry on from where the user actually is.
+        visible = self.visible_indexes()
+        if visible and self.current_index not in visible:
+            self.current_index = visible[0]
+            self.selected_detection_index = None
+            self.persistence.set_state(self.LAST_INDEX_KEY, str(self.current_index))
+        self.notify()
+
+    def detection_targets(self, force_all: bool = False) -> list[ImageRecord]:
+        """Images the next run should analyse.
+
+        Manual edits are never overwritten. Otherwise the run picks up what has
+        not been analysed yet, and falls back to a full re-run once everything
+        has - which is what the user means by pressing the button again.
+        """
+        if force_all:
+            return [
+                img for img in self.queue.images
+                if img.status != ImageStatus.MODIFIED
+            ]
+        return [
+            img for img in self.queue.images
+            if img.status in (ImageStatus.PENDING, ImageStatus.FAILED)
+        ]
 
     def try_resume(self) -> bool:
         folder = self.persistence.get_state(self.LAST_FOLDER_KEY)
@@ -114,11 +170,27 @@ class AppState:
         self.persistence.set_state(self.LAST_INDEX_KEY, str(self.current_index))
         self.notify()
 
+    def _step(self, offset: int) -> None:
+        """Move within the filtered view, which is what the sidebar shows.
+
+        Stepping over the raw queue instead would land on images the sidebar is
+        hiding, and the highlighted row would stop following the canvas.
+        """
+        visible = self.visible_indexes()
+        if not visible:
+            return
+        if self.current_index in visible:
+            position = visible.index(self.current_index) + offset
+        else:
+            position = 0 if offset > 0 else len(visible) - 1
+        position = max(0, min(position, len(visible) - 1))
+        self.select_image(visible[position])
+
     def next_image(self) -> None:
-        self.select_image(self.current_index + 1)
+        self._step(1)
 
     def previous_image(self) -> None:
-        self.select_image(self.current_index - 1)
+        self._step(-1)
 
     def select_detection(self, index: int | None) -> None:
         image = self.current_image
@@ -186,29 +258,30 @@ class AppState:
     def run_detection(
             self,
             on_update: Callable[[], None],
-            on_finished: Callable[[int], None],
-            only_pending: bool = True,
-    ) -> None:
+            on_finished: Callable[[BatchResult], None],
+            force_all: bool = False,
+    ) -> int:
+        """Start a run and return how many images it will analyse."""
         import asyncio
         loop = asyncio.get_event_loop()
 
-        images = list(self.queue.images)
-        total = sum(1 for i in images if not only_pending or i.status == ImageStatus.PENDING)
-        self.detection_progress = (0, total)
+        targets = self.detection_targets(force_all=force_all)
+        self.detection_progress = (0, len(targets))
         self.notify()
 
-        def progress(done: int, total_: int, _img: ImageRecord) -> None:
-            self.detection_progress = (done, total_)
+        def progress(done: int, total: int, _img: ImageRecord) -> None:
+            self.detection_progress = (done, total)
             loop.call_soon_threadsafe(on_update)
 
-        def done(processed: int) -> None:
+        def done(result: BatchResult) -> None:
             def _finish() -> None:
                 self.queue.refresh()
-                on_finished(processed)
+                on_finished(result)
 
             loop.call_soon_threadsafe(_finish)
 
-        self.prediction.run_batch_async(images, progress, done, only_pending=only_pending)
+        self.prediction.run_batch_async(targets, progress, done)
+        return len(targets)
 
     def cancel_detection(self) -> None:
         self.prediction.cancel()
