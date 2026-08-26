@@ -18,6 +18,7 @@ from services.export_service import ExportService
 from services.image_queue_service import ImageQueueService
 from services.persistence_service import PersistenceService
 from services.prediction_service import BatchResult, PredictionService
+from services.system_service import open_folder
 
 
 async def _pick_folder_webview() -> str | None:
@@ -196,6 +197,66 @@ def register_dashboard_page(image_url_builder) -> None:
                 return
             ui.notify(summary, type='positive')
 
+        def _open_folder(path: Path | None, missing: str) -> None:
+            if path is None or not path.is_dir():
+                ui.notify(missing, type='warning', multi_line=True)
+                return
+            if not open_folder(path):
+                ui.notify(f"Impossible d'ouvrir {path}", type='negative', multi_line=True)
+
+        def on_open_export_folder() -> None:
+            triees = state.triees_dir
+            if triees is None:
+                ui.notify("Chargez d'abord un dossier.", type='warning')
+                return
+            _open_folder(
+                triees,
+                f"Aucun export pour l'instant : {triees} sera créé au premier export.",
+            )
+
+        # Built once: a dialog rebuilt at every export would pile up on the page.
+        export_dirs: dict[str, Path | None] = {'triees': None, 'corrections': None}
+
+        def _open_exported(key: str) -> None:
+            export_dialog.close()
+            _open_folder(export_dirs[key], 'Dossier introuvable.')
+
+        with ui.dialog() as export_dialog, ui.card().style('min-width: 460px;'):
+            ui.label('Export terminé').classes('app-title')
+            export_summary = ui.label().classes('app-muted').style(
+                'white-space: pre-line; word-break: break-all;'
+            )
+            with ui.row().classes('w-full justify-end gap-2').style('margin-top: 12px;'):
+                ui.button('Fermer', on_click=export_dialog.close) \
+                    .props('flat no-caps').classes('app-ghost')
+                corrections_btn = (
+                    ui.button('Ouvrir les corrections',
+                              on_click=lambda: _open_exported('corrections'))
+                    .props('no-caps flat dense padding="6px 14px"')
+                    .classes('app-outline')
+                )
+                ui.button('Ouvrir le dossier', icon='folder_open',
+                          on_click=lambda: _open_exported('triees')) \
+                    .props('no-caps').classes('app-primary')
+
+        def _report_export(summary: dict) -> None:
+            triees = Path(summary['triees_dir']) if summary['triees_dir'] else None
+            corrections = Path(summary['corrections_dir']) if summary['corrections'] else None
+            export_dirs['triees'] = triees
+            export_dirs['corrections'] = corrections
+
+            lines = [f"{summary['exported']} image(s) exportée(s) → {triees}"]
+            if corrections:
+                lines.append(f"{summary['corrections']} correction(s) → {corrections}")
+            if summary.get('uncropped'):
+                lines.append(
+                    f"{summary['uncropped']} image(s) copiée(s) sans recadrage — "
+                    f"{summary.get('warning', '')}"
+                )
+            corrections_btn.set_visibility(corrections is not None)
+            export_summary.text = '\n'.join(lines)
+            export_dialog.open()
+
         def on_export() -> None:
             if state.export_running or state.prediction.running:
                 return
@@ -207,12 +268,15 @@ def register_dashboard_page(image_url_builder) -> None:
             def on_done(summary: dict) -> None:
                 with _client:
                     if 'error' in summary:
-                        ui.notify(f"Erreur export : {summary['error']}", type='negative')
+                        ui.notify(
+                            f"Erreur export : {summary['error']}",
+                            type='negative',
+                            multi_line=True,
+                            timeout=0,
+                            close_button='Fermer',
+                        )
                         return
-                    msg = f"{summary['exported']} image(s) exportée(s) → {summary['triees_dir']}"
-                    if summary['corrections']:
-                        msg += f"  |  {summary['corrections']} correction(s) → {summary['corrections_dir']}"
-                    ui.notify(msg, type='positive')
+                    _report_export(summary)
 
             state.run_export_async(on_done)
 
@@ -226,6 +290,7 @@ def register_dashboard_page(image_url_builder) -> None:
                 on_reset_folder=on_reset_folder,
                 on_run_detection=on_run_detection,
                 on_export=on_export,
+                on_open_export_folder=on_open_export_folder,
                 on_open_settings=settings_dialog.open,
             )
 

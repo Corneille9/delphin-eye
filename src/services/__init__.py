@@ -3,6 +3,7 @@ from services.persistence_service import PersistenceService
 from services.prediction_service import PredictionService
 from services.export_service import ExportService
 from services.preview_service import PreviewService, preview_scale
+from services.system_service import open_folder
 
 __all__ = [
     'ImageQueueService',
@@ -11,4 +12,5 @@ __all__ = [
     'ExportService',
     'PreviewService',
     'preview_scale',
+    'open_folder',
 ]

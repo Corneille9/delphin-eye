@@ -17,6 +17,7 @@ class TopBar:
             on_reset_folder: Callable[[], None],
             on_run_detection: Callable[[], None],
             on_export: Callable[[], None],
+            on_open_export_folder: Callable[[], None],
             on_open_settings: Callable[[], None],
     ) -> None:
         self.state = state
@@ -70,6 +71,14 @@ class TopBar:
                     .classes('app-outline')
                 )
 
+                self.open_export_btn = (
+                    ui.button(icon='folder_open', on_click=on_open_export_folder)
+                    .props('flat round dense')
+                    .classes('app-ghost')
+                )
+                with self.open_export_btn:
+                    self.open_export_tip = ui.tooltip('Ouvrir le dossier des images triées')
+
                 ui.button(icon='settings', on_click=on_open_settings) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
@@ -106,6 +115,12 @@ class TopBar:
             self.folder_btn.text = 'Réinitialiser'
             self.folder_btn.props('icon=folder_off')
             self.folder_btn.classes(remove='app-outline', add='app-ghost-danger')
+
+        triees = self.state.triees_dir
+        self.open_export_tip.text = (
+            f'Ouvrir le dossier des images triées : {triees}' if triees
+            else 'Ouvrir le dossier des images triées'
+        )
 
         busy = self.state.prediction.running or self.state.export_running
 
