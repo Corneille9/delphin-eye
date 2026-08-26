@@ -72,6 +72,11 @@ class AppState:
         return result
 
     @property
+    def triees_dir(self) -> Path | None:
+        folder = self.queue.folder
+        return self.export.compute_triees_path(Path(folder)) if folder else None
+
+    @property
     def analysed_count(self) -> int:
         return sum(1 for img in self.queue.images if img.status in ANALYSED_STATUSES)
 

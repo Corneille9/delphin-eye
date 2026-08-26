@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import shutil
 from pathlib import Path
 
 from config import get_settings
 from models.entities import ImageRecord, ImageStatus
+
+logger = logging.getLogger(__name__)
 
 
 class ExportService:
@@ -20,7 +23,10 @@ class ExportService:
     def export_all(self, images: list[ImageRecord]) -> dict:
         detected = [img for img in images if img.detections]
         if not detected:
-            return {'exported': 0, 'corrections': 0, 'triees_dir': '', 'corrections_dir': ''}
+            return {
+                'exported': 0, 'corrections': 0, 'uncropped': 0, 'warning': '',
+                'triees_dir': '', 'corrections_dir': '',
+            }
 
         settings = get_settings()
         folder = Path(detected[0].folder)
@@ -28,17 +34,23 @@ class ExportService:
         corrections_root = self.compute_corrections_path(folder)
 
         exported = 0
+        uncropped = 0
+        warning = ''
         for img in detected:
             dst = triees_root / Path(img.absolute_path).relative_to(folder)
             dst.parent.mkdir(parents=True, exist_ok=True)
             try:
                 self._crop_and_annotate(img, dst, margin=settings.crop_margin)
                 exported += 1
-            except Exception:
-                # Fallback: copy original if image processing fails
+            except Exception as exc:
+                # The original still gets copied, but the caller has to know the
+                # crop did not happen instead of trusting a silent success.
+                logger.exception('Crop failed on %s', img.filename)
+                warning = warning or f'{type(exc).__name__} : {exc}'
                 try:
                     shutil.copy2(img.absolute_path, dst)
                     exported += 1
+                    uncropped += 1
                 except (shutil.SameFileError, FileNotFoundError, OSError):
                     pass
 
@@ -59,6 +71,8 @@ class ExportService:
         return {
             'exported': exported,
             'corrections': corrections,
+            'uncropped': uncropped,
+            'warning': warning,
             'triees_dir': str(triees_root),
             'corrections_dir': str(corrections_root),
         }
@@ -97,56 +111,48 @@ class ExportService:
         cy2 = min(H, int(bottom + margin))
 
         cropped = pil.crop((cx1, cy1, cx2, cy2))
-        cW, cH = cropped.size
 
         # Number fins only when there are two or more
         if len(dets) > 1:
-            draw = ImageDraw.Draw(cropped)
-            font_size = max(20, int(cH * 0.05))
-            font = ExportService._load_font(font_size)
-
-            # Sort left-to-right by horizontal center
-            sorted_dets = sorted(dets, key=lambda d: (d.x1 + d.x2) / 2)
-
-            for num, det in enumerate(sorted_dets, start=1):
-                # Translate bbox to cropped-image coordinates
-                bx1 = det.x1 - cx1
-                by1 = det.y1 - cy1
-                bx2 = det.x2 - cx1
-
-                label = str(num)
-                tb = draw.textbbox((0, 0), label, font=font)
-                tw = tb[2] - tb[0]
-                th = tb[3] - tb[1]
-                pad = max(3, font_size // 6)
-                gap = max(6, font_size // 3)
-
-                # Background: centered above the top edge of the bbox
-                bg_w = tw + pad * 2
-                bg_h = th + pad * 2
-                bg_x1 = (bx1 + bx2) / 2 - bg_w / 2
-                bg_y1 = by1 - gap - bg_h
-                bg_x2 = bg_x1 + bg_w
-                bg_y2 = bg_y1 + bg_h
-
-                # Clamp to crop bounds
-                if bg_x1 < 0:
-                    bg_x1, bg_x2 = 0, bg_w
-                if bg_x2 > cW:
-                    bg_x1, bg_x2 = cW - bg_w, cW
-                if bg_y1 < 0:
-                    bg_y1, bg_y2 = 0, bg_h
-
-                draw.rectangle(
-                    [bg_x1, bg_y1, bg_x2, bg_y2],
-                    fill='white',
-                    outline='#222222',
-                    width=1,
-                )
-                # Offset by tb origin so text is truly centered inside the background
-                draw.text((bg_x1 + pad - tb[0], bg_y1 + pad - tb[1]), label, fill='#111111', font=font)
+            ExportService._number_fins(ImageDraw.Draw(cropped), dets, (cx1, cy1), cropped.size)
 
         cropped.save(dst, quality=92)
+
+    @staticmethod
+    def _number_fins(draw, dets: list, origin: tuple[int, int], size: tuple[int, int]) -> None:
+        """Number the fins left to right, each plate kept inside the crop."""
+        cx1, cy1 = origin
+        cW, cH = size
+        font_size = max(20, int(cH * 0.05))
+        font = ExportService._load_font(font_size)
+        pad = max(3, font_size // 6)
+        gap = max(6, font_size // 3)
+
+        for num, det in enumerate(sorted(dets, key=lambda d: (d.x1 + d.x2) / 2), start=1):
+            label = str(num)
+            tb = draw.textbbox((0, 0), label, font=font)
+            # Capped on purpose: a text backend reporting an absurd advance used
+            # to stretch the plate into a band across the whole crop.
+            tw = min(tb[2] - tb[0], font_size * len(label))
+            th = min(tb[3] - tb[1], font_size * 2)
+
+            plate_w = min(tw + pad * 2, cW)
+            plate_h = min(th + pad * 2, cH)
+            x = min(max((det.x1 + det.x2) / 2 - cx1 - plate_w / 2, 0), cW - plate_w)
+            y = det.y1 - cy1 - gap - plate_h
+            if y < 0:
+                # No room above the fin: drop the plate just below the box top.
+                y = det.y1 - cy1 + gap
+            y = min(max(y, 0), cH - plate_h)
+
+            draw.rectangle(
+                [x, y, x + plate_w, y + plate_h],
+                fill='white',
+                outline='#222222',
+                width=1,
+            )
+            # Offset by tb origin so the digit sits inside the plate.
+            draw.text((x + pad - tb[0], y + pad - tb[1]), label, fill='#111111', font=font)
 
     @staticmethod
     def _load_font(size: int):
