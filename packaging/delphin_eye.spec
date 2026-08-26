@@ -9,6 +9,7 @@ PyTorch are deliberately left out.
 Build with:  pyinstaller packaging/delphin_eye.spec --noconfirm
 """
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -88,19 +89,78 @@ SYSTEM_ONLY_LIBS = (
     'libgmodule-2.0', 'libgthread-2.0', 'libgirepository-1.0',
     # GLib links these; they have to match the GLib actually in use.
     'libffi', 'libpcre2-8', 'libbsd', 'libmd',
+    # Mesa (drirc parsing) and fontconfig both link expat.
+    'libexpat',
     # X11 and graphics: the system Mesa/EGL is linked against the system libX11.
     # A bundled copy shadows it and WebKit's compositor then dies with
     # "Could not create default EGL display: EGL_BAD_PARAMETER".
     'libX11.so', 'libXau', 'libXdmcp', 'libXext', 'libICE', 'libSM',
     'libEGL', 'libGL.so', 'libGLX', 'libGLdispatch', 'libgbm', 'libdrm',
     'libwayland-',
+    # The GCC runtime. Mesa loads libLLVM for shader compilation, and the
+    # system libLLVM needs a libstdc++ at least as new as the one it was built
+    # against (GLIBCXX_3.4.32 on Ubuntu 24.04). The runner's copy is older, so
+    # bundling it makes eglInitialize fail and the window stays blank. Nothing
+    # we ship needs more than GLIBCXX_3.4.22 / GCC_4.3.0, which every
+    # distribution recent enough to carry WebKitGTK 4.1 already provides.
+    'libstdc++', 'libgcc_s',
 )
+
+# Libraries we knowingly ship unhashed. PyInstaller puts _internal on
+# LD_LIBRARY_PATH, so anything listed here shadows the system copy for the
+# whole GTK/WebKit/Mesa stack, in this process and in the WebKit subprocesses.
+# The three blank-window bugs so far were all a library that did not belong
+# here. This is not a proof of correctness: it only makes a NEW unhashed
+# system library fail the build loudly instead of shipping a blank window.
+KNOWN_UNHASHED_LIBS = frozenset({
+    'libbz2.so.1.0', 'libcrypto.so.3', 'liblzma.so.5', 'libncursesw.so.6',
+    'libpcre.so.3', 'libpython3.12.so.1.0', 'libreadline.so.8',
+    'libsqlite3.so.0', 'libssl.so.3', 'libtinfo.so.6', 'libuuid.so.1',
+    'libz.so.1',
+})
+
+# A PyInstaller-mangled name (libfoo.a1b2c3d4.so.1, libfoo-a1b2c3d4.so.1)
+# carries a content hash, so it cannot collide with a system library.
+HASHED_LIB = re.compile(r'[.-][0-9a-f]{8}\.(so|\d)')
+
+
+def _unexpected_unhashed(binaries):
+    """Unhashed libraries landing at the root of _internal.
+
+    Only the root matters: that is the single directory PyInstaller puts on
+    LD_LIBRARY_PATH. A library under a package directory (torch/lib/...) is
+    found through its RPATH and shadows nothing.
+    """
+    seen = set()
+    for entry in binaries:
+        dest = entry[0]
+        if os.path.dirname(dest):
+            continue
+        name = os.path.basename(dest)
+        if '.so' in name and not HASHED_LIB.search(name):
+            seen.add(name)
+    return sorted(seen - KNOWN_UNHASHED_LIBS)
+
 
 if sys.platform == 'linux':
     a.binaries = [
         entry for entry in a.binaries
         if not os.path.basename(entry[0]).startswith(SYSTEM_ONLY_LIBS)
     ]
+
+    unexpected = [
+        name for name in _unexpected_unhashed(a.binaries)
+        if not name.startswith(('_', 'lib_'))
+        and '.cpython-' not in name
+    ]
+    if unexpected:
+        raise SystemExit(
+            'Nouvelles bibliotheques non hachees dans le bundle :\n  '
+            + '\n  '.join(unexpected)
+            + '\n\nChacune masque la copie systeme pour GTK/WebKit/Mesa.'
+              '\nSoit elle appartient a la pile systeme -> SYSTEM_ONLY_LIBS,'
+              '\nsoit elle est inoffensive -> KNOWN_UNHASHED_LIBS.'
+        )
 
 pyz = PYZ(a.pure)
 
