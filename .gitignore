@@ -235,3 +235,8 @@ default4/
 /dist/
 .venv-build/
 output/cache/
+
+# Artefacts de packaging
+*.deb
+DelphinEye-*.tar.gz
+DelphinEye-*.zip

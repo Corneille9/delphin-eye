@@ -8,6 +8,8 @@ PyTorch are deliberately left out.
 
 Build with:  pyinstaller packaging/delphin_eye.spec --noconfirm
 """
+import os
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all
@@ -73,6 +75,22 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
+# The app deliberately drives the system GTK/WebKit stack through the
+# distribution's PyGObject. Shipping our own GLib makes the system libgobject
+# resolve its symbols against the bundled (older) copy, which fails at startup
+# with "undefined symbol: g_dir_unref" on any machine whose GLib is newer than
+# the build runner's. These have to come from the system, as a matched set.
+SYSTEM_ONLY_LIBS = (
+    'libglib-2.0', 'libgobject-2.0', 'libgio-2.0',
+    'libgmodule-2.0', 'libgthread-2.0', 'libgirepository-1.0',
+)
+
+if sys.platform == 'linux':
+    a.binaries = [
+        entry for entry in a.binaries
+        if not os.path.basename(entry[0]).startswith(SYSTEM_ONLY_LIBS)
+    ]
 
 pyz = PYZ(a.pure)
 

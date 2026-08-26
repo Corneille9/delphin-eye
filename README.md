@@ -22,7 +22,7 @@ Delphin Eye automatise la première étape : détecter et localiser les nageoire
 - Un modèle YOLO entraîné (le modèle recommandé de `config/inference.yaml` est utilisé par défaut)
 - **Sur Linux uniquement**, les bibliothèques de la fenêtre native :
   ```bash
-  sudo apt install python3-gi python3-gi-cairo gir1.2-webkit2-4.1
+  sudo apt install python3-gi gir1.2-webkit2-4.1
   ```
   Windows (WebView2) et macOS (WebKit) n'ont rien à installer.
 
@@ -98,6 +98,31 @@ Si le dossier source contient `_sauvegarde` dans son nom, le suffixe est remplac
 ## Configuration
 
 Les paramètres (chemin du modèle, seuil de confiance, marge de recadrage) sont accessibles via l'icône ⚙️ dans la barre du haut et sauvegardés dans `config/user_settings.json`.
+
+## Installation depuis une release
+
+Les exécutables sont publiés automatiquement sur la [page Releases](../../releases).
+
+**Linux** — le `.deb` est à préférer : apt installe les bibliothèques de la fenêtre native.
+
+```bash
+sudo apt install ./delphin-eye_amd64.deb
+delphin-eye                       # ou via le menu des applications
+```
+
+Il cible Ubuntu 24.04 et dérivés (Python 3.12). Sur une autre distribution, utiliser l'archive :
+
+```bash
+sudo apt install python3-gi gir1.2-webkit2-4.1
+tar -xzf DelphinEye-linux-x86_64.tar.gz
+./DelphinEye/DelphinEye
+```
+
+L'archive est un dossier autonome, déplaçable n'importe où. Sans les paquets ci-dessus l'application démarre quand même, mais dans le navigateur.
+
+**Windows** — décompresser le `.zip` et lancer `DelphinEye.exe`. Windows SmartScreen affiche un avertissement tant que l'exécutable n'est pas signé (Informations complémentaires → Exécuter quand même).
+
+**macOS** — décompresser et glisser `DelphinEye.app` dans Applications. Le bundle n'étant pas signé, le premier lancement se fait par clic droit → Ouvrir.
 
 ## Build
 

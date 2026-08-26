@@ -12,7 +12,7 @@ from components import (
     StatusPanel,
     TopBar,
 )
-from config import apply_theme, get_settings, native_enabled
+from config import apply_theme, get_settings, native_active
 from models.app_state import AppState
 from services.export_service import ExportService
 from services.image_queue_service import ImageQueueService
@@ -119,7 +119,7 @@ def register_dashboard_page(image_url_builder) -> None:
                 ui.notify(f'Erreur : {exc}', type='negative')
 
         async def on_select_folder() -> None:
-            if native_enabled():
+            if native_active():
                 folder = await _pick_folder_webview()
                 if folder:
                     _load_folder(Path(folder))
