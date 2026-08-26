@@ -82,8 +82,18 @@ a = Analysis(
 # with "undefined symbol: g_dir_unref" on any machine whose GLib is newer than
 # the build runner's. These have to come from the system, as a matched set.
 SYSTEM_ONLY_LIBS = (
+    # GLib: shipping our own makes the system libgobject resolve against it
+    # ("undefined symbol: g_dir_unref").
     'libglib-2.0', 'libgobject-2.0', 'libgio-2.0',
     'libgmodule-2.0', 'libgthread-2.0', 'libgirepository-1.0',
+    # GLib links these; they have to match the GLib actually in use.
+    'libffi', 'libpcre2-8', 'libbsd', 'libmd',
+    # X11 and graphics: the system Mesa/EGL is linked against the system libX11.
+    # A bundled copy shadows it and WebKit's compositor then dies with
+    # "Could not create default EGL display: EGL_BAD_PARAMETER".
+    'libX11.so', 'libXau', 'libXdmcp', 'libXext', 'libICE', 'libSM',
+    'libEGL', 'libGL.so', 'libGLX', 'libGLdispatch', 'libgbm', 'libdrm',
+    'libwayland-',
 )
 
 if sys.platform == 'linux':
