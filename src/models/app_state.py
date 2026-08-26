@@ -75,11 +75,6 @@ class AppState:
     def analysed_count(self) -> int:
         return sum(1 for img in self.queue.images if img.status in ANALYSED_STATUSES)
 
-    @property
-    def detection_count(self) -> int:
-        """Fins found, not images - the two numbers answer different questions."""
-        return sum(len(img.detections) for img in self.queue.images)
-
     def matches_filter(self, image: ImageRecord) -> bool:
         if self.queue_filter == 'all':
             return True

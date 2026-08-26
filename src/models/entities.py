@@ -54,8 +54,8 @@ class DetectionSource(str, Enum):
 
 STATUS_LABEL_FR: dict[ImageStatus, str] = {
     ImageStatus.PENDING: 'En attente',
-    ImageStatus.EMPTY: 'Analysée · aucun aileron',
-    ImageStatus.DETECTED: 'Analysée · aileron détecté',
+    ImageStatus.EMPTY: 'Aucun aileron',
+    ImageStatus.DETECTED: 'Aileron détecté',
     ImageStatus.MODIFIED: 'Modifiée',
     ImageStatus.FAILED: "Échec de l'analyse",
 }
