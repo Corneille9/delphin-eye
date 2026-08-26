@@ -9,7 +9,9 @@ from pathlib import Path
 from fastapi.responses import FileResponse, Response
 from nicegui import app, native, ui
 
-from config import assets_dir, cache_dir, get_settings, is_frozen, native_enabled
+from config import (
+    assets_dir, cache_dir, get_settings, is_frozen, native_enabled, set_native_active,
+)
 from database import get_repository
 from pages.dashboard import register_dashboard_page
 from services.preview_service import PreviewService
@@ -81,8 +83,8 @@ def _native_backend_error() -> str | None:
     except Exception as exc:
         return (
             f'the GTK/WebKit libraries are missing ({type(exc).__name__}: {exc}). '
-            'Install them with: sudo apt install python3-gi python3-gi-cairo '
-            'gir1.2-webkit2-4.1'
+            'Install them with: sudo apt install python3-gi gir1.2-webkit2-4.1 '
+            '- or use the .deb, which pulls them in automatically.'
         )
     return None
 
@@ -120,6 +122,7 @@ def main() -> None:
             print('Falling back to the browser.', file=sys.stderr)
             native_window, fell_back = False, True
 
+    set_native_active(native_window)
     ui.run(
         title='Delphin Eye',
         favicon=str(assets / 'favicon.ico'),

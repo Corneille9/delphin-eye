@@ -90,6 +90,19 @@ jobs:
         if: runner.os == 'Linux'
         run: tar -czf "${{ matrix.asset }}" -C dist DelphinEye
 
+      # The .deb is what makes the GTK/WebKit libraries install themselves;
+      # the tarball cannot express dependencies.
+      - name: Package (.deb)
+        if: runner.os == 'Linux'
+        run: |
+          TAG="${{ needs.prepare.outputs.tag }}"
+          if [ "$TAG" = "latest" ]; then
+            VERSION="0.0.0+$(git rev-parse --short HEAD)"
+          else
+            VERSION="${TAG#v}"
+          fi
+          packaging/build_deb.sh "$VERSION" dist/DelphinEye delphin-eye_amd64.deb
+
       # BUNDLE produces a real .app on macOS; ditto keeps its metadata intact,
       # which a plain zip would strip.
       - name: Archive (macOS)
@@ -104,3 +117,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ needs.prepare.outputs.tag }}" "${{ matrix.asset }}" --clobber
+
+      - name: Upload the .deb
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.prepare.outputs.tag }}" delphin-eye_amd64.deb --clobber

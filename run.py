@@ -32,7 +32,7 @@ def link_system_gi():
     The native webview needs `gi`, which pip cannot build from source. Linking
     just that package keeps the rest of the system site-packages (matplotlib,
     numpy, ...) out of the venv, where they would shadow the pip versions.
-    Install it with: sudo apt install python3-gi python3-gi-cairo gir1.2-webkit2-4.1
+    Install it with: sudo apt install python3-gi gir1.2-webkit2-4.1
     """
     if sys.platform != "linux":
         return

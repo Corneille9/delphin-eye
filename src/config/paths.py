@@ -44,6 +44,24 @@ def assets_dir() -> Path:
     return resource_dir() / 'src' / 'assets'
 
 
+_NATIVE_ACTIVE = False
+
+
+def set_native_active(value: bool) -> None:
+    """Record whether the native window really started (main() decides this)."""
+    global _NATIVE_ACTIVE
+    _NATIVE_ACTIVE = value
+
+
+def native_active() -> bool:
+    """Whether a native window is actually running, as opposed to requested.
+
+    ``native_enabled()`` is the intent; this is the outcome, which differs
+    whenever the webview backend is missing and the UI fell back to a browser.
+    """
+    return _NATIVE_ACTIVE
+
+
 def cache_dir() -> Path:
     """Regenerable files (canvas previews). Safe to delete at any time."""
     if is_frozen():
