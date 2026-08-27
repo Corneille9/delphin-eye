@@ -1,51 +1,60 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 from nicegui import ui
 
 
 @dataclass(frozen=True)
 class Theme:
-    primary: str = '#2563EB'
-    secondary: str = '#475569'
-    border: str = '#E2E8F0'
-    background: str = '#F1F5F9'
+    """Ocean palette sampled from the dolphin logo: blue-grey body, slate outline.
+
+    Every colour the UI paints comes from here: the CSS below only ever reads
+    ``var(--color-*)``, and Quasar's own palette is aligned with it in
+    ``apply_theme`` so ``color=primary``, ``type='positive'`` and friends land on
+    the same values.
+    """
+
+    primary: str = '#2A6F97'
+    primary_dark: str = '#1F567A'
+    primary_soft: str = '#E6EFF6'
+    secondary: str = '#468FAF'
+    accent: str = '#E08A2E'
+    accent_soft: str = '#FBEEDB'
+
     surface: str = '#FFFFFF'
-    text: str = '#0F172A'
-    muted: str = '#64748B'
-    validation: str = '#16A34A'
-    warning: str = '#D97706'
-    danger: str = '#DC2626'
-    info: str = '#0EA5E9'
-    selection: str = '#2563EB'
+    surface_muted: str = '#EEF3F7'
+    background: str = '#F2F6F9'
+    border: str = '#DBE4EC'
+    text: str = '#12293B'
+    muted: str = '#5F7688'
+    canvas: str = '#0C1F2E'
+
+    validation: str = '#2E9E6B'
+    validation_soft: str = '#E1F4EB'
+    validation_ink: str = '#1C6B47'
+    warning: str = '#D98324'
+    warning_soft: str = '#FAEEDC'
+    warning_ink: str = '#8C5310'
+    danger: str = '#D2504A'
+    danger_soft: str = '#FAE8E7'
+    danger_ink: str = '#8E3330'
+    info: str = '#3E8FC0'
 
     def as_css_vars(self) -> str:
-        return (
-            f'--color-primary: {self.primary};'
-            f'--color-secondary: {self.secondary};'
-            f'--color-border: {self.border};'
-            f'--color-background: {self.background};'
-            f'--color-surface: {self.surface};'
-            f'--color-text: {self.text};'
-            f'--color-muted: {self.muted};'
-            f'--color-validation: {self.validation};'
-            f'--color-warning: {self.warning};'
-            f'--color-danger: {self.danger};'
-            f'--color-info: {self.info};'
-            f'--color-selection: {self.selection};'
-            # Override Quasar's built-in color variables so .props('color=primary/positive/negative') works
-            f'--q-primary: {self.primary};'
-            f'--q-secondary: {self.secondary};'
-            f'--q-positive: {self.validation};'
-            f'--q-negative: {self.danger};'
-            f'--q-info: {self.info};'
-            f'--q-warning: {self.warning};'
-            f'--q-dark: {self.text};'
+        return ''.join(
+            f'--color-{field.name.replace("_", "-")}: {getattr(self, field.name)};'
+            for field in fields(self)
         )
 
 
 THEME = Theme()
+
+
+#: Colours the canvas overlay paints, kept next to the palette they belong to.
+CANVAS_AUTO_COLOR = THEME.primary
+CANVAS_MANUAL_COLOR = THEME.validation
+CANVAS_SELECTED_COLOR = THEME.accent
 
 
 GLOBAL_CSS = """
@@ -53,24 +62,78 @@ GLOBAL_CSS = """
 
 *, *::before, *::after { box-sizing: border-box; }
 
+html, body, #app {
+    height: 100%;
+    margin: 0;
+    /* The shell fills the window and each pane scrolls on its own; letting the
+       document scroll would push the bottom toolbar out of view. */
+    overflow: hidden;
+}
+
 body {
-    background: var(--color-background);
+    background: var(--color-surface);
     color: var(--color-text);
     font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 
-.app-surface {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+/* NiceGUI wraps every page in q-layout > q-page > .nicegui-content and gives
+   that last one a 1rem padding and gap. A desktop shell has to sit flush
+   against the window edges instead. */
+.nicegui-layout, .q-page-container, .q-page, .nicegui-content {
+    height: 100%;
+    min-height: 0 !important;
 }
+.nicegui-content {
+    padding: 0;
+    gap: 0;
+    align-items: stretch;
+}
+/* Same story inside scroll areas: the panes bring their own padding, and
+   flex-start would stop the queue rows from filling the width. */
+.nicegui-scroll-area .q-scrollarea__content {
+    padding: 0;
+    gap: 0;
+    align-items: stretch;
+}
+
+/* ---------------------------------------------------------------- shell --- */
+
+.app-shell {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface);
+}
+.app-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+}
+.app-pane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--color-surface);
+}
+.app-pane-top    { flex-shrink: 0; border-bottom: 1px solid var(--color-border); }
+.app-pane-left   { width: 260px; flex-shrink: 0; border-right: 1px solid var(--color-border); }
+.app-pane-right  { width: 288px; flex-shrink: 0; border-left: 1px solid var(--color-border); }
+.app-pane-main   { flex: 1; min-width: 0; }
+
+.app-pane-header {
+    flex-shrink: 0;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+/* --------------------------------------------------------- typography ----- */
 
 .app-brand {
     font-size: 1rem;
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--color-text);
     letter-spacing: -0.02em;
 }
 .app-title {
@@ -89,6 +152,8 @@ body {
     line-height: 1.3;
 }
 
+/* -------------------------------------------------------------- badges ---- */
+
 .app-badge {
     display: inline-flex;
     align-items: center;
@@ -100,11 +165,11 @@ body {
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
-.app-badge-pending  { background: #F1F5F9; color: #475569; }
-.app-badge-empty    { background: #FEF3C7; color: #92400E; }
-.app-badge-detected { background: #DCFCE7; color: #166534; }
-.app-badge-manual   { background: #DBEAFE; color: #1E40AF; }
-.app-badge-failed   { background: #FEE2E2; color: #991B1B; }
+.app-badge-pending  { background: var(--color-surface-muted);   color: var(--color-muted); }
+.app-badge-empty    { background: var(--color-warning-soft);    color: var(--color-warning-ink); }
+.app-badge-detected { background: var(--color-validation-soft); color: var(--color-validation-ink); }
+.app-badge-manual   { background: var(--color-primary-soft);    color: var(--color-primary-dark); }
+.app-badge-failed   { background: var(--color-danger-soft);     color: var(--color-danger-ink); }
 
 .status-dot {
     display: inline-block;
@@ -115,18 +180,20 @@ body {
 }
 /* Every status gets its own colour: an analysed image with no fin has to be
    distinguishable from one that was never analysed. */
-.status-dot-pending  { background: #CBD5E1; }
-.status-dot-empty    { background: #F59E0B; }
-.status-dot-detected { background: #22C55E; }
-.status-dot-modified { background: #3B82F6; }
-.status-dot-failed   { background: #EF4444; }
+.status-dot-pending  { background: #B7C7D3; }
+.status-dot-empty    { background: var(--color-warning); }
+.status-dot-detected { background: var(--color-validation); }
+.status-dot-modified { background: var(--color-primary); }
+.status-dot-failed   { background: var(--color-danger); }
+
+/* --------------------------------------------------------------- queue ---- */
 
 .app-queue-count {
     flex-shrink: 0;
     font-size: 0.66rem;
     font-weight: 700;
-    color: #166534;
-    background: #DCFCE7;
+    color: var(--color-validation-ink);
+    background: var(--color-validation-soft);
     border-radius: 999px;
     padding: 1px 6px;
 }
@@ -143,30 +210,46 @@ body {
     transition: background 0.1s;
     user-select: none;
 }
-.app-queue-item:hover  { background: #F1F5F9; }
+.app-queue-item:hover  { background: var(--color-surface-muted); }
 .app-queue-item.active {
-    background: #EFF6FF;
-    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    color: var(--color-primary-dark);
     font-weight: 600;
 }
 
+/* ------------------------------------------------------------- buttons ---- */
+/* Variants below drive their own colours, so their buttons are built with
+   `color=None`: a Quasar `color=` would add a `text-*`/`bg-*` class that wins
+   the cascade (Quasar's utilities are `!important` inside a CSS layer). */
 
 .q-btn:not(.q-btn--round) { border-radius: 8px !important; }
+.q-btn { font-weight: 600; }
 
-.q-btn.app-ghost {
-    color: var(--color-muted) !important;
-}
+.q-btn.app-ghost { color: var(--color-muted); }
 .q-btn.app-ghost:hover {
-    background: #F1F5F9 !important;
-    color: var(--color-text) !important;
+    background: var(--color-surface-muted);
+    color: var(--color-text);
 }
+
+.q-btn.app-ghost-danger { color: var(--color-danger); }
+.q-btn.app-ghost-danger:hover { background: var(--color-danger-soft); }
 
 .q-btn.app-outline {
-    border: 1.5px solid var(--color-border) !important;
-    color: var(--color-text) !important;
-    background: transparent !important;
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    background: var(--color-surface);
 }
-.q-btn.app-outline:hover { background: #F8FAFC !important; }
+.q-btn.app-outline:hover {
+    background: var(--color-surface-muted);
+    border-color: var(--color-primary);
+    color: var(--color-primary-dark);
+}
+
+.q-btn.app-toggled {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary-dark);
+}
 
 .toolbar-sep {
     width: 1px;
@@ -176,9 +259,65 @@ body {
     align-self: center;
 }
 
+/* ------------------------------------------------------------- canvas ----- */
+
+.app-canvas {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 50% 40%, rgba(70, 143, 175, 0.16), transparent 62%),
+        var(--color-canvas);
+}
+
+/* ui.interactive_image hardcodes width/height: 100% on its <img>, which gives
+   the wrapper no intrinsic size to resolve its aspect-ratio box against. Chrome
+   falls back to the image's natural size, WebKit resolves it to zero and the
+   photo never shows up. Letting the image size itself works in both - and makes
+   the wrapper shrink-wrap the photo, so the SVG overlay lines up exactly. */
+.app-canvas-image {
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: auto !important;
+}
+.app-canvas-image > img {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+}
+
+.app-canvas-caption {
+    background: rgba(6, 20, 30, 0.62);
+    color: rgba(255, 255, 255, 0.92);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.79rem;
+    font-weight: 500;
+    pointer-events: none;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-canvas-hint {
+    position: absolute;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+
+/* ---------------------------------------------------------- scrollbars ---- */
+
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: #C2D0DB; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
 
 @media (max-width: 1100px) {
@@ -187,26 +326,21 @@ body {
 """
 
 
-CANVAS_IMAGE_CSS = """
-/* ui.interactive_image hardcodes width/height: 100% on its <img>, which gives
-   the wrapper no intrinsic size to resolve its aspect-ratio box against. Chrome
-   falls back to the image's natural size, WebKit resolves it to zero and the
-   photo never shows up. Letting the image size itself works in both. */
-.app-canvas-image {
-  max-width: 100%;
-  max-height: 100%;
-  aspect-ratio: auto !important;
-}
-.app-canvas-image > img {
-  width: auto !important;
-  height: auto !important;
-  max-width: 100%;
-  max-height: 100%;
-  display: block;
-}
-"""
-
-
 def apply_theme(theme: Theme = THEME) -> None:
-    css = GLOBAL_CSS.replace('__VARS__', theme.as_css_vars())
-    ui.add_head_html(f'<style>{css}{CANVAS_IMAGE_CSS}</style>')
+    """Install the palette for the current page.
+
+    ``ui.colors`` is what actually reaches Quasar's ``--q-*`` variables, so
+    ``color=primary``, ``ui.notify(type=...)`` and the progress bar pick up the
+    palette instead of NiceGUI's defaults.
+    """
+    ui.colors(
+        primary=theme.primary,
+        secondary=theme.secondary,
+        accent=theme.accent,
+        dark=theme.text,
+        positive=theme.validation,
+        negative=theme.danger,
+        info=theme.info,
+        warning=theme.warning,
+    )
+    ui.add_head_html(f'<style>{GLOBAL_CSS.replace("__VARS__", theme.as_css_vars())}</style>')

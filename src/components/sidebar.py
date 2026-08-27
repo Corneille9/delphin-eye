@@ -25,16 +25,13 @@ class Sidebar:
         self.state = state
         self._last_index: int | None = None
 
-        with ui.element('div').classes('app-surface').style(
-            'width: 256px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;'
-        ):
-            with ui.element('div').style(
-                'padding: 12px 14px 10px; border-bottom: 1px solid var(--color-border); flex-shrink: 0;'
-            ):
+        with ui.element('div').classes('app-pane app-pane-left'):
+            with ui.element('div').classes('app-pane-header'):
                 with ui.row().classes('items-center justify-between w-full no-wrap').style('margin-bottom: 8px;'):
                     ui.label("File d'attente").classes('app-title')
                     self.counter_label = ui.label('0 / 0').classes('app-caption').style(
-                        'background: #F1F5F9; padding: 2px 8px; border-radius: 999px;'
+                        'background: var(--color-surface-muted); '
+                        'padding: 2px 8px; border-radius: 999px;'
                     )
 
                 self.filter = ui.select(

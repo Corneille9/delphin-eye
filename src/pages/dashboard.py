@@ -99,14 +99,15 @@ def register_dashboard_page(image_url_builder) -> None:
                     .classes('w-full')
                 )
                 with ui.row().classes('w-full justify-end gap-2').style('margin-top: 12px;'):
-                    ui.button('Annuler', on_click=dialog.close).props('flat no-caps').classes('app-ghost')
+                    ui.button('Annuler', on_click=dialog.close, color=None) \
+                        .props('flat no-caps').classes('app-ghost')
 
                     def confirm() -> None:
                         path = Path(str(inp.value or '')).expanduser()
                         dialog.close()
                         _load_folder(path)
 
-                    ui.button('Ouvrir', on_click=confirm).props('no-caps').classes('app-primary')
+                    ui.button('Ouvrir', on_click=confirm).props('no-caps unelevated')
             dialog.open()
 
         def _load_folder(path: Path) -> None:
@@ -227,17 +228,17 @@ def register_dashboard_page(image_url_builder) -> None:
                 'white-space: pre-line; word-break: break-all;'
             )
             with ui.row().classes('w-full justify-end gap-2').style('margin-top: 12px;'):
-                ui.button('Fermer', on_click=export_dialog.close) \
+                ui.button('Fermer', on_click=export_dialog.close, color=None) \
                     .props('flat no-caps').classes('app-ghost')
                 corrections_btn = (
                     ui.button('Ouvrir les corrections',
-                              on_click=lambda: _open_exported('corrections'))
+                              on_click=lambda: _open_exported('corrections'), color=None)
                     .props('no-caps flat dense padding="6px 14px"')
                     .classes('app-outline')
                 )
                 ui.button('Ouvrir le dossier', icon='folder_open',
                           on_click=lambda: _open_exported('triees')) \
-                    .props('no-caps').classes('app-primary')
+                    .props('no-caps unelevated')
 
         def _report_export(summary: dict) -> None:
             triees = Path(summary['triees_dir']) if summary['triees_dir'] else None
@@ -280,10 +281,7 @@ def register_dashboard_page(image_url_builder) -> None:
 
             state.run_export_async(on_done)
 
-        with ui.element('div').style(
-                'width: 100%; height: 100vh; overflow: hidden; '
-                'display: flex; flex-direction: column; gap: 8px; padding: 8px;'
-        ):
+        with ui.element('div').classes('app-shell'):
             TopBar(
                 state,
                 on_select_folder=on_select_folder,
@@ -294,21 +292,16 @@ def register_dashboard_page(image_url_builder) -> None:
                 on_open_settings=settings_dialog.open,
             )
 
-            with ui.element('div').style(
-                    'flex: 1; min-height: 0; '
-                    'display: flex; flex-direction: row; gap: 8px;'
-            ):
+            with ui.element('div').classes('app-body'):
                 Sidebar(state)
 
-                with ui.element('div').classes('app-surface').style(
-                        'flex: 1; min-width: 0; min-height: 0; overflow: hidden; '
-                        'display: flex; flex-direction: column;'
-                ):
+                with ui.element('div').classes('app-pane app-pane-main'):
                     canvas = CanvasView(state, image_url_builder=image_url_builder)
                     ActionToolbar(
                         state,
                         on_add_box=canvas.start_add_mode,
                         on_delete_box=canvas.delete_selected,
+                        is_add_mode=lambda: canvas.add_mode,
                     )
 
                 StatusPanel(state)
@@ -322,6 +315,9 @@ def register_dashboard_page(image_url_builder) -> None:
                 state.next_image()
             elif event.key.delete:
                 canvas.delete_selected()
+            elif event.key.escape:
+                canvas.cancel_add_mode()
+                state.select_detection(None)
             elif str(getattr(event.key, 'name', '')).lower() == 'a':
                 canvas.start_add_mode()
 

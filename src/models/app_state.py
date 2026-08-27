@@ -131,14 +131,14 @@ class AppState:
         path = Path(folder)
         if not path.is_dir():
             return False
-        self.load_folder(path)
+        # Read before loading: load_folder resets the stored position to 0.
         try:
             last_index = int(self.persistence.get_state(self.LAST_INDEX_KEY) or '0')
         except ValueError:
             last_index = 0
+        self.load_folder(path)
         if self.queue.images:
-            self.current_index = max(0, min(last_index, len(self.queue.images) - 1))
-        self.notify()
+            self.select_image(last_index)
         return True
 
     def reset_folder(self) -> None:
