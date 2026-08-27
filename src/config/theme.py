@@ -7,39 +7,40 @@ from nicegui import ui
 
 @dataclass(frozen=True)
 class Theme:
-    """Ocean palette sampled from the dolphin logo: blue-grey body, slate outline.
+    """Vivid palette: an electric blue lead, backed by saturated status colours.
 
     Every colour the UI paints comes from here: the CSS below only ever reads
     ``var(--color-*)``, and Quasar's own palette is aligned with it in
     ``apply_theme`` so ``color=primary``, ``type='positive'`` and friends land on
-    the same values.
+    the same values. The ``*_soft`` tints are backgrounds and the ``*_ink`` tones
+    the text that sits on them, so the saturated hues stay readable.
     """
 
-    primary: str = '#2A6F97'
-    primary_dark: str = '#1F567A'
-    primary_soft: str = '#E6EFF6'
-    secondary: str = '#468FAF'
-    accent: str = '#E08A2E'
-    accent_soft: str = '#FBEEDB'
+    primary: str = '#0B69FF'
+    primary_dark: str = '#0047CC'
+    primary_soft: str = '#E1ECFF'
+    secondary: str = '#00A6FB'
+    accent: str = '#FF8A00'
+    accent_soft: str = '#FFEFD9'
 
     surface: str = '#FFFFFF'
-    surface_muted: str = '#EEF3F7'
-    background: str = '#F2F6F9'
-    border: str = '#DBE4EC'
-    text: str = '#12293B'
-    muted: str = '#5F7688'
-    canvas: str = '#0C1F2E'
+    surface_muted: str = '#F1F5FA'
+    background: str = '#F4F7FC'
+    border: str = '#DCE4EF'
+    text: str = '#101B2D'
+    muted: str = '#5E7086'
+    canvas: str = '#0B1622'
 
-    validation: str = '#2E9E6B'
-    validation_soft: str = '#E1F4EB'
-    validation_ink: str = '#1C6B47'
-    warning: str = '#D98324'
-    warning_soft: str = '#FAEEDC'
-    warning_ink: str = '#8C5310'
-    danger: str = '#D2504A'
-    danger_soft: str = '#FAE8E7'
-    danger_ink: str = '#8E3330'
-    info: str = '#3E8FC0'
+    validation: str = '#00BF63'
+    validation_soft: str = '#DAF7E8'
+    validation_ink: str = '#037A44'
+    warning: str = '#FF8A00'
+    warning_soft: str = '#FFEFD9'
+    warning_ink: str = '#9A5200'
+    danger: str = '#FF3B30'
+    danger_soft: str = '#FFE4E1'
+    danger_ink: str = '#B31E15'
+    info: str = '#00A6FB'
 
     def as_css_vars(self) -> str:
         return ''.join(
