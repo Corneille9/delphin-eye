@@ -5,7 +5,9 @@ from typing import Callable
 
 from nicegui import events, ui
 
-from config.theme import CANVAS_AUTO_COLOR, CANVAS_MANUAL_COLOR, CANVAS_SELECTED_COLOR
+from config.theme import (
+    CANVAS_AUTO_COLOR, CANVAS_MANUAL_COLOR, CANVAS_SELECTED_COLOR, THEME,
+)
 from models.app_state import AppState
 from models.entities import Detection, DetectionSource, ImageRecord
 from services.preview_service import preview_scale
@@ -51,6 +53,12 @@ attach();
 """
 
 _MOVE_THROTTLE = 0.04
+
+
+def _label_ink(color: str) -> str:
+    """Text colour a label chip needs to stay readable on ``color``."""
+    red, green, blue = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return THEME.text if 0.213 * red + 0.715 * green + 0.072 * blue > 0.5 else '#FFFFFF'
 
 
 class CanvasView:
@@ -434,6 +442,7 @@ class CanvasView:
 
             # A hand-drawn box has no confidence to report; "100 %" would be a lie.
             label = f'#{det.local_id}' if is_manual else f'#{det.local_id} {det.confidence:.0%}'
+            ink = _label_ink(stroke)
             label_w = len(label) * font * 0.62 + pad * 2
 
             x1, y1 = det.x1 * scale, det.y1 * scale
@@ -456,7 +465,7 @@ class CanvasView:
             parts.append(
                 f'<text x="{x1 + pad:.1f}" y="{label_y + label_h - pad * 0.85:.1f}" '
                 f'font-size="{font:.1f}" font-family="ui-monospace,monospace" '
-                f'font-weight="600" fill="#FFFFFF" pointer-events="none">{label}</text>'
+                f'font-weight="600" fill="{ink}" pointer-events="none">{label}</text>'
             )
             if is_selected:
                 parts.append(self._handles_svg(x1, y1, x2, y2, upp))
