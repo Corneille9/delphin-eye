@@ -76,8 +76,9 @@ class SettingsDialog:
             self._preview = ui.html('').style('font-size: 0.8rem;')
 
             with ui.row().classes('w-full justify-end').style('margin-top: 16px;'):
-                ui.button('Annuler', on_click=self.dialog.close).props('flat no-caps').classes('app-ghost')
-                ui.button('Enregistrer', on_click=self._save).props('no-caps').classes('app-primary')
+                ui.button('Annuler', on_click=self.dialog.close, color=None) \
+                    .props('flat no-caps').classes('app-ghost')
+                ui.button('Enregistrer', on_click=self._save).props('no-caps unelevated')
 
     def _build_model_options(self) -> dict[str, str]:
         options: dict[str, str] = {}
@@ -148,7 +149,7 @@ class SettingsDialog:
 
         self._preview.content = (
             '<div style="font-family: ui-monospace, monospace; line-height: 1.9; '
-            'background: var(--color-bg); border-radius: 6px; padding: 10px 14px;">'
+            'background: var(--color-surface-muted); border-radius: 8px; padding: 10px 14px;">'
             f'<div>📁 <strong>{triees.name}/</strong></div>'
             '<div style="margin-left: 20px; color: var(--color-muted);">'
             f'└─ {detected} image{"s" if detected != 1 else ""} avec ailerons détectés'

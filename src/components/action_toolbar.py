@@ -13,8 +13,10 @@ class ActionToolbar:
             state: AppState,
             on_add_box: Callable[[], None],
             on_delete_box: Callable[[], None],
+            is_add_mode: Callable[[], bool],
     ) -> None:
         self.state = state
+        self._is_add_mode = is_add_mode
 
         with ui.element('div').style(
                 'flex-shrink: 0; '
@@ -35,27 +37,29 @@ class ActionToolbar:
 
                 ui.space()
 
-                ui.button(icon='chevron_left', on_click=state.previous_image) \
+                ui.button(icon='chevron_left', on_click=state.previous_image, color=None) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
                     .tooltip('Image précédente')
 
-                ui.button(icon='chevron_right', on_click=state.next_image) \
+                ui.button(icon='chevron_right', on_click=state.next_image, color=None) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
                     .tooltip('Image suivante')
 
                 ui.element('div').classes('toolbar-sep')
 
-                ui.button('Ajouter aileron', icon='add_box', on_click=on_add_box) \
-                    .props('flat no-caps dense padding="6px 12px"') \
-                    .classes('app-outline') \
-                    .tooltip('A · glissez sur l\'image pour dessiner')
+                self.add_btn = (
+                    ui.button('Ajouter aileron', icon='add_box', on_click=on_add_box, color=None)
+                    .props('flat no-caps dense padding="6px 12px"')
+                    .classes('app-outline')
+                    .tooltip("A · puis glissez sur l'image pour dessiner")
+                )
 
-                ui.button(icon='delete_outline', on_click=on_delete_box) \
+                ui.button(icon='delete_outline', on_click=on_delete_box, color=None) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
-                    .tooltip('Suppr · supprimer l\'aileron sélectionné')
+                    .tooltip("Suppr · supprimer l'aileron sélectionné")
 
         state.subscribe(self.refresh)
         self.refresh()
@@ -72,3 +76,8 @@ class ActionToolbar:
             n = len(image.detections)
             det_str = f'  ·  {n} aileron{"s" if n > 1 else ""}' if n else '  ·  aucun aileron'
             self.index_label.text = f'Image {idx} / {total}{det_str}'
+
+        if self._is_add_mode():
+            self.add_btn.classes(add='app-toggled')
+        else:
+            self.add_btn.classes(remove='app-toggled')

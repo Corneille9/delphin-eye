@@ -8,6 +8,8 @@ from nicegui import ui
 
 from models.app_state import AppState
 
+LOGO_URL = '/assets/web-app-manifest-192x192.png'
+
 
 class TopBar:
     def __init__(
@@ -24,14 +26,14 @@ class TopBar:
         self._on_select_folder = on_select_folder
         self._on_reset_folder = on_reset_folder
 
-        with ui.element('div').classes('app-surface').style(
-                'flex-shrink: 0; padding: 10px 16px;'
-        ):
+        with ui.element('div').classes('app-pane app-pane-top').style('padding: 10px 16px;'):
             with ui.row().classes('w-full items-center gap-3 no-wrap'):
                 with ui.element('div').style(
-                        'display: flex; align-items: center; gap: 7px; flex-shrink: 0;'
+                        'display: flex; align-items: center; gap: 8px; flex-shrink: 0;'
                 ):
-                    ui.icon('water').style('font-size: 1.3rem; color: var(--color-primary);')
+                    ui.image(LOGO_URL).props('no-spinner fit=contain').style(
+                        'width: 26px; height: 26px; flex-shrink: 0;'
+                    )
                     ui.label('Delphin Eye').classes('app-brand')
 
                 self.folder_label = (
@@ -48,38 +50,39 @@ class TopBar:
                 with ui.element('div').classes('app-hide-md').style(
                         'display: flex; align-items: center; gap: 8px; flex-shrink: 0;'
                 ):
-                    self.progress = ui.linear_progress(value=0.0, show_value=False).style(
-                        'width: 110px; height: 6px;'
-                    )
+                    self.progress = ui.linear_progress(value=0.0, show_value=False) \
+                        .props('rounded') \
+                        .style('width: 110px; height: 6px;')
                     self.progress_label = ui.label('0 / 0').classes('app-caption').style(
                         'white-space: nowrap; min-width: 44px; text-align: right;'
                     )
 
                 self.folder_btn = (
-                    ui.button('Dossier', icon='folder_open', on_click=self._handle_folder_click)
+                    ui.button('Dossier', icon='folder_open',
+                              on_click=self._handle_folder_click, color=None)
                     .props('no-caps flat dense padding="6px 14px"')
                     .classes('app-outline')
                 )
 
                 self.run_button = ui.button(
                     'Détecter', icon='play_arrow', on_click=on_run_detection
-                ).props('no-caps color=primary unelevated padding="7px 16px"').style('color: white;')
+                ).props('no-caps unelevated padding="7px 16px"')
 
                 self.export_btn = (
-                    ui.button('Exporter', icon='file_download', on_click=on_export)
+                    ui.button('Exporter', icon='file_download', on_click=on_export, color=None)
                     .props('no-caps flat dense padding="6px 14px"')
                     .classes('app-outline')
                 )
 
                 self.open_export_btn = (
-                    ui.button(icon='folder_open', on_click=on_open_export_folder)
+                    ui.button(icon='folder_open', on_click=on_open_export_folder, color=None)
                     .props('flat round dense')
                     .classes('app-ghost')
                 )
                 with self.open_export_btn:
                     self.open_export_tip = ui.tooltip('Ouvrir le dossier des images triées')
 
-                ui.button(icon='settings', on_click=on_open_settings) \
+                ui.button(icon='settings', on_click=on_open_settings, color=None) \
                     .props('flat round dense') \
                     .classes('app-ghost') \
                     .tooltip('Paramètres')

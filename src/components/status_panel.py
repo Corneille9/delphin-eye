@@ -14,12 +14,8 @@ class StatusPanel:
     def __init__(self, state: AppState) -> None:
         self.state = state
 
-        with ui.element('div').classes('app-surface app-hide-md').style(
-                'width: 280px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden;'
-        ):
-            with ui.element('div').style(
-                    'padding: 12px 14px 10px; border-bottom: 1px solid var(--color-border); flex-shrink: 0;'
-            ):
+        with ui.element('div').classes('app-pane app-pane-right app-hide-md'):
+            with ui.element('div').classes('app-pane-header'):
                 ui.label('Informations').classes('app-title')
 
             with ui.scroll_area().style('flex: 1; min-height: 0;'):
